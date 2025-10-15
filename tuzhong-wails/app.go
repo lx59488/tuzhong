@@ -60,9 +60,13 @@ func main() {
 
 	// 使用配置选项创建应用程序
 	err := wails.Run(&options.App{
-		Title:  "图种生成器",
-		Width:  600,
-		Height: 400,
+		Title:     "图种生成器",
+		Width:     900,
+		Height:    750,
+		MinWidth:  700,
+		MinHeight: 600,
+		MaxWidth:  1400,
+		MaxHeight: 1000,
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},
