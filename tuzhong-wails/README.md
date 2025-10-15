@@ -1,19 +1,38 @@
-# README
+# 图种生成器 (Wails 版本)
 
-## About
+## 关于项目
 
-This is the official Wails Vanilla template.
+这是一个基于 Wails 框架开发的图种生成器应用程序。
 
-You can configure the project by editing `wails.json`. More information about the project settings can be found
-here: https://wails.io/docs/reference/project-config
+您可以通过编辑 `wails.json` 来配置项目。更多关于项目设置的信息可以在这里找到：
+https://wails.io/docs/reference/project-config
 
-## Live Development
+## 实时开发
 
-To run in live development mode, run `wails dev` in the project directory. This will run a Vite development
-server that will provide very fast hot reload of your frontend changes. If you want to develop in a browser
-and have access to your Go methods, there is also a dev server that runs on http://localhost:34115. Connect
-to this in your browser, and you can call your Go code from devtools.
+要在实时开发模式下运行，请在项目目录中运行 `wails dev`。这将启动一个 Vite 开发服务器，
+为前端更改提供非常快速的热重载。如果您想在浏览器中开发并访问您的 Go 方法，
+还有一个运行在 http://localhost:34115 的开发服务器。在浏览器中连接到这个地址，
+您可以从开发者工具调用您的 Go 代码。
 
-## Building
+## 构建
 
-To build a redistributable, production mode package, use `wails build`.
+要构建可分发的生产模式包，请使用 `wails build`。
+
+## 功能特性
+
+- 选择封面图片（支持 JPG、JPEG、PNG 格式）
+- 选择压缩包文件（支持 ZIP 格式）
+- 将图片和压缩包合并生成图种文件
+- 现代化的 Web 界面
+- 跨平台支持
+
+## 使用方法
+
+1. 运行 `wails dev` 启动开发服务器
+2. 或者运行 `wails build` 构建可执行文件
+3. 启动应用程序
+4. 选择封面图片
+5. 选择要隐藏的压缩包
+6. 输入输出文件名
+7. 选择保存位置
+8. 点击"生成图种"按钮完成制作

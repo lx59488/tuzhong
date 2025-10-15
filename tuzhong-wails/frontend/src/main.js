@@ -40,7 +40,7 @@ let zipResult = document.getElementById("zipResult");
 let selectedImagePath = "";
 let selectedZipPath = "";
 
-// Handle image file selection
+// 处理图片文件选择
 selectImageBtn.addEventListener('click', function() {
     SelectImageFile()
         .then((filePath) => {
@@ -56,7 +56,7 @@ selectImageBtn.addEventListener('click', function() {
         });
 });
 
-// Handle zip file selection
+// 处理压缩包文件选择
 selectZipBtn.addEventListener('click', function() {
     SelectZipFile()
         .then((filePath) => {
@@ -72,7 +72,7 @@ selectZipBtn.addEventListener('click', function() {
         });
 });
 
-// Handle generate button click
+// 处理生成按钮点击事件
 generateBtn.addEventListener('click', function() {
     const outputName = outputInput.value.trim();
     

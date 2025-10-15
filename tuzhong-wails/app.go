@@ -13,52 +13,52 @@ import (
 //go:embed all:frontend/dist
 var assets embed.FS
 
-// App struct
+// App 应用结构体
 type App struct {
 	ctx       context.Context
 	generator *backend.Generator
 }
 
-// NewApp creates a new App application struct
+// NewApp 创建一个新的应用程序结构实例
 func NewApp() *App {
 	return &App{
 		generator: backend.NewGenerator(),
 	}
 }
 
-// startup is called when the app starts. The context passed
-// can be used to perform startup tasks, such as saving
-// the context for future use
+// startup 在应用启动时调用。传入的上下文
+// 可用于执行启动任务，例如保存
+// 上下文供将来使用
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 	a.generator.SetContext(ctx)
 }
 
-// SelectImageFile wraps the backend SelectImageFile method
+// SelectImageFile 包装后端的 SelectImageFile 方法
 func (a *App) SelectImageFile() (string, error) {
 	return a.generator.SelectImageFile()
 }
 
-// SelectZipFile wraps the backend SelectZipFile method
+// SelectZipFile 包装后端的 SelectZipFile 方法
 func (a *App) SelectZipFile() (string, error) {
 	return a.generator.SelectZipFile()
 }
 
-// SelectSaveLocation wraps the backend SelectSaveLocation method
+// SelectSaveLocation 包装后端的 SelectSaveLocation 方法
 func (a *App) SelectSaveLocation(defaultName string) (string, error) {
 	return a.generator.SelectSaveLocation(defaultName)
 }
 
-// MergeFiles wraps the backend MergeFiles method for frontend access
+// MergeFiles 包装后端的 MergeFiles 方法供前端访问
 func (a *App) MergeFiles(imagePath, zipPath, outputPath string) (string, error) {
 	return a.generator.MergeFiles(imagePath, zipPath, outputPath)
 }
 
 func main() {
-	// Create an instance of the app structure
+	// 创建应用程序结构的实例
 	app := NewApp()
 
-	// Create application with options
+	// 使用配置选项创建应用程序
 	err := wails.Run(&options.App{
 		Title:  "图种生成器",
 		Width:  600,
