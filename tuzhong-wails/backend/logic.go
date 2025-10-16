@@ -3,6 +3,7 @@ package backend
 import (
 	"archive/zip"
 	"context"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"os"
@@ -32,11 +33,102 @@ func (g *Generator) SelectImageFile() (string, error) {
 		Filters: []runtime.FileFilter{
 			{
 				DisplayName: "图片文件",
-				Pattern:     "*.jpg;*.jpeg;*.png",
+				Pattern:     "*.jpg;*.jpeg;*.png;*.gif;*.bmp;*.webp",
 			},
 		},
 	})
 	return file, err
+}
+
+// 获取图片的 base64 编码，用于预览
+func (g *Generator) GetImageBase64(imagePath string) (string, error) {
+	if imagePath == "" {
+		return "", fmt.Errorf("图片路径为空")
+	}
+
+	// 检查文件是否存在
+	if _, err := os.Stat(imagePath); os.IsNotExist(err) {
+		return "", fmt.Errorf("图片文件不存在: %s", imagePath)
+	}
+
+	// 读取图片文件
+	imageData, err := os.ReadFile(imagePath)
+	if err != nil {
+		return "", fmt.Errorf("读取图片文件失败: %v", err)
+	}
+
+	// 检查文件大小（限制为 20MB，增加限制）
+	if len(imageData) > 20*1024*1024 {
+		return "", fmt.Errorf("图片文件太大（%.2f MB），请选择小于 20MB 的图片", float64(len(imageData))/(1024*1024))
+	}
+
+	// 检查文件是否为空
+	if len(imageData) == 0 {
+		return "", fmt.Errorf("图片文件为空")
+	}
+
+	// 根据文件扩展名确定 MIME 类型
+	ext := strings.ToLower(filepath.Ext(imagePath))
+	var mimeType string
+	switch ext {
+	case ".jpg", ".jpeg":
+		mimeType = "image/jpeg"
+	case ".png":
+		mimeType = "image/png"
+	case ".gif":
+		mimeType = "image/gif"
+	case ".bmp":
+		mimeType = "image/bmp"
+	case ".webp":
+		mimeType = "image/webp"
+	default:
+		// 如果扩展名不匹配，尝试检测文件头
+		mimeType = g.detectImageMimeType(imageData)
+		if mimeType == "" {
+			return "", fmt.Errorf("不支持的图片格式: %s", ext)
+		}
+	}
+
+	// 转换为 base64
+	base64String := base64.StdEncoding.EncodeToString(imageData)
+
+	// 返回完整的 data URL
+	return fmt.Sprintf("data:%s;base64,%s", mimeType, base64String), nil
+}
+
+// 通过文件头检测图片格式
+func (g *Generator) detectImageMimeType(data []byte) string {
+	if len(data) < 4 {
+		return ""
+	}
+
+	// JPEG
+	if len(data) >= 2 && data[0] == 0xFF && data[1] == 0xD8 {
+		return "image/jpeg"
+	}
+
+	// PNG
+	if len(data) >= 8 && data[0] == 0x89 && data[1] == 0x50 && data[2] == 0x4E && data[3] == 0x47 &&
+		data[4] == 0x0D && data[5] == 0x0A && data[6] == 0x1A && data[7] == 0x0A {
+		return "image/png"
+	}
+
+	// GIF
+	if len(data) >= 6 && string(data[0:6]) == "GIF87a" || string(data[0:6]) == "GIF89a" {
+		return "image/gif"
+	}
+
+	// BMP
+	if len(data) >= 2 && data[0] == 0x42 && data[1] == 0x4D {
+		return "image/bmp"
+	}
+
+	// WebP
+	if len(data) >= 12 && string(data[0:4]) == "RIFF" && string(data[8:12]) == "WEBP" {
+		return "image/webp"
+	}
+
+	return ""
 }
 
 // 选择任意文件

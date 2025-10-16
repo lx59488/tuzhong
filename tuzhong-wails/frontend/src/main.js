@@ -2,7 +2,7 @@ import './style.css';
 import './app.css';
 
 import logo from './assets/images/logo-universal.png';
-import {MergeFiles, SelectImageFile, SelectFile, SelectFolder, SelectSaveLocation, OpenFileLocation} from '../wailsjs/go/main/App';
+import {MergeFiles, SelectImageFile, SelectFile, SelectFolder, SelectSaveLocation, OpenFileLocation, GetImageBase64} from '../wailsjs/go/main/App';
 import {EventsOn} from '../wailsjs/runtime/runtime';
 
 document.querySelector('#app').innerHTML = `
@@ -32,12 +32,24 @@ document.querySelector('#app').innerHTML = `
                     </div>
                     <div class="file-input-container">
                         <button id="selectImageBtn" class="file-btn">
-                            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                                <polyline points="7,10 12,15 17,10"/>
-                                <line x1="12" y1="15" x2="12" y2="3"/>
-                            </svg>
-                            <span>选择图片文件</span>
+                            <div class="btn-content">
+                                <div class="btn-left">
+                                    <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                        <polyline points="7,10 12,15 17,10"/>
+                                        <line x1="12" y1="15" x2="12" y2="3"/>
+                                    </svg>
+                                    <span>选择图片文件</span>
+                                </div>
+                                <div class="btn-preview">
+                                    <div id="miniPreviewContainer" class="mini-preview-container hidden">
+                                        <img id="miniPreviewImage" class="mini-preview-image" src="" alt="预览"/>
+                                        <div class="mini-preview-loading">
+                                            <div class="mini-loading-spinner"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </button>
                         <div id="imageResult" class="file-result">
                             <span class="file-name"></span>
@@ -174,6 +186,9 @@ let generateBtn = document.getElementById("generateBtn");
 let resultDiv = document.getElementById("result");
 let imageResult = document.getElementById("imageResult");
 let targetResult = document.getElementById("targetResult");
+let miniPreviewContainer = document.getElementById("miniPreviewContainer");
+let miniPreviewImage = document.getElementById("miniPreviewImage");
+let miniPreviewLoading = document.querySelector(".mini-preview-loading");
 
 // 进度条相关元素
 let progressModal = document.getElementById("progressModal");
@@ -198,15 +213,20 @@ selectImageBtn.addEventListener('click', function() {
     SelectImageFile()
         .then((filePath) => {
             if (filePath) {
+                console.log("选择的图片路径:", filePath);
                 selectedImagePath = filePath;
                 const fileName = filePath.split('\\').pop().split('/').pop();
                 const fileNameSpan = imageResult.querySelector('.file-name');
                 fileNameSpan.textContent = `已选择: ${fileName}`;
                 imageResult.className = "file-result success";
+                
+                // 显示小图预览
+                showMiniPreview(filePath);
             }
         })
         .catch((err) => {
             console.error("选择图片失败:", err);
+            showResult("选择图片失败: " + err, "error");
         });
 });
 
@@ -302,6 +322,32 @@ function setButtonLoading(loading) {
 function showResult(message, type) {
     resultDiv.textContent = message;
     resultDiv.className = `result ${type}`;
+    
+    // 如果是错误信息，添加点击清除功能
+    if (type === "error" && message) {
+        resultDiv.style.cursor = "pointer";
+        resultDiv.title = "点击清除错误信息";
+        resultDiv.onclick = function() {
+            showResult("", "");
+            resultDiv.onclick = null;
+            resultDiv.style.cursor = "default";
+            resultDiv.title = "";
+        };
+        
+        // 5秒后自动清除错误信息
+        setTimeout(() => {
+            if (resultDiv.className.includes("error")) {
+                showResult("", "");
+                resultDiv.onclick = null;
+                resultDiv.style.cursor = "default";
+                resultDiv.title = "";
+            }
+        }, 5000);
+    } else {
+        resultDiv.style.cursor = "default";
+        resultDiv.title = "";
+        resultDiv.onclick = null;
+    }
 }
 
 // 清除图片选择
@@ -310,6 +356,8 @@ function clearImageSelection() {
     const fileNameSpan = imageResult.querySelector('.file-name');
     fileNameSpan.textContent = "";
     imageResult.className = "file-result";
+    hideMiniPreview();
+    // 确保清除所有错误信息
     showResult("", "");
 }
 
@@ -319,6 +367,93 @@ function clearTargetSelection() {
     const fileNameSpan = targetResult.querySelector('.file-name');
     fileNameSpan.textContent = "";
     targetResult.className = "file-result";
+    showResult("", "");
+}
+
+// 显示小图预览
+function showMiniPreview(imagePath) {
+    console.log("开始加载图片预览:", imagePath);
+    
+    // 清除之前可能存在的错误信息
+    showResult("", "");
+    
+    // 显示预览容器和加载状态
+    miniPreviewContainer.classList.remove("hidden");
+    miniPreviewLoading.style.display = "block";
+    miniPreviewImage.style.display = "none";
+    
+    // 清除之前的事件监听器，避免重复触发
+    miniPreviewImage.onload = null;
+    miniPreviewImage.onerror = null;
+    
+    // 获取图片的 base64 数据
+    GetImageBase64(imagePath)
+        .then((base64Data) => {
+            console.log("成功获取图片base64数据，长度:", base64Data.length);
+            
+            // 设置事件监听器
+            miniPreviewImage.onload = function() {
+                console.log("图片加载成功");
+                miniPreviewLoading.style.display = "none";
+                miniPreviewImage.style.display = "block";
+                // 清除可能的错误信息
+                showResult("", "");
+            };
+            
+            miniPreviewImage.onerror = function() {
+                console.error("图片渲染失败，可能的原因：base64格式错误或浏览器不支持该格式");
+                miniPreviewLoading.style.display = "none";
+                showPreviewError("图片显示失败");
+            };
+            
+            // 设置图片源
+            miniPreviewImage.src = base64Data;
+        })
+        .catch((err) => {
+            console.error("获取图片预览失败:", err);
+            miniPreviewLoading.style.display = "none";
+            showPreviewError("预览失败: " + err);
+        });
+}
+
+// 显示预览错误信息
+function showPreviewError(message) {
+    miniPreviewContainer.innerHTML = `
+        <div class="preview-error">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="15" y1="9" x2="9" y2="15"/>
+                <line x1="9" y1="9" x2="15" y2="15"/>
+            </svg>
+        </div>
+    `;
+    
+    // 不在结果区域显示错误信息，只在控制台记录
+    console.warn("预览错误:", message);
+    
+    // 3秒后隐藏预览容器
+    setTimeout(() => {
+        hideMiniPreview();
+    }, 3000);
+}
+
+// 隐藏小图预览
+function hideMiniPreview() {
+    miniPreviewContainer.classList.add("hidden");
+    
+    // 重置容器内容，移除可能的错误状态
+    miniPreviewContainer.innerHTML = `
+        <img id="miniPreviewImage" class="mini-preview-image" src="" alt="预览"/>
+        <div class="mini-preview-loading">
+            <div class="mini-loading-spinner"></div>
+        </div>
+    `;
+    
+    // 重新获取元素引用
+    miniPreviewImage = document.getElementById("miniPreviewImage");
+    miniPreviewLoading = document.querySelector(".mini-preview-loading");
+    
+    // 清除结果区域的错误信息
     showResult("", "");
 }
 

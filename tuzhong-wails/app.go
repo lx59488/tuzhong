@@ -39,6 +39,11 @@ func (a *App) SelectImageFile() (string, error) {
 	return a.generator.SelectImageFile()
 }
 
+// GetImageBase64 包装后端的 GetImageBase64 方法
+func (a *App) GetImageBase64(imagePath string) (string, error) {
+	return a.generator.GetImageBase64(imagePath)
+}
+
 // SelectFile 包装后端的 SelectFile 方法
 func (a *App) SelectFile() (string, error) {
 	return a.generator.SelectFile()
