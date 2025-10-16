@@ -6,14 +6,22 @@ export function MergeFiles(arg1, arg2, arg3) {
   return window['go']['main']['App']['MergeFiles'](arg1, arg2, arg3);
 }
 
+export function OpenFileLocation(arg1) {
+  return window['go']['main']['App']['OpenFileLocation'](arg1);
+}
+
+export function SelectFile() {
+  return window['go']['main']['App']['SelectFile']();
+}
+
+export function SelectFolder() {
+  return window['go']['main']['App']['SelectFolder']();
+}
+
 export function SelectImageFile() {
   return window['go']['main']['App']['SelectImageFile']();
 }
 
 export function SelectSaveLocation(arg1) {
   return window['go']['main']['App']['SelectSaveLocation'](arg1);
-}
-
-export function SelectZipFile() {
-  return window['go']['main']['App']['SelectZipFile']();
 }

@@ -150,6 +150,17 @@
     min-height: 50px;
 }
 
+.button-group {
+    display: flex;
+    gap: 10px;
+    width: 100%;
+}
+
+.half-width {
+    width: 50% !important;
+    flex: 1;
+}
+
 .file-btn::before {
     content: '';
     position: absolute;
@@ -482,4 +493,198 @@
     .header {
         margin-bottom: 20px;
     }
+}
+
+/* 模态框样式 */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(5px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    transition: opacity 0.3s ease;
+}
+
+.modal.hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.modal-content {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 20px;
+    padding: 30px;
+    min-width: 400px;
+    max-width: 90vw;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+    transform: scale(0.9);
+    transition: transform 0.3s ease;
+}
+
+.modal:not(.hidden) .modal-content {
+    transform: scale(1);
+}
+
+/* 进度条模态框样式 */
+.progress-header h3 {
+    color: white;
+    margin: 0 0 20px 0;
+    font-size: 20px;
+    text-align: center;
+}
+
+.progress-text {
+    color: rgba(255, 255, 255, 0.9);
+    margin-bottom: 15px;
+    font-size: 14px;
+    text-align: center;
+}
+
+.progress-bar-container {
+    position: relative;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    height: 20px;
+    margin-bottom: 20px;
+    overflow: hidden;
+}
+
+.progress-bar {
+    background: linear-gradient(45deg, #4ecdc4, #44a08d);
+    height: 100%;
+    width: 0%;
+    border-radius: 10px;
+    transition: width 0.3s ease;
+    position: relative;
+}
+
+.progress-bar::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
+.progress-percentage {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: white;
+    font-size: 12px;
+    font-weight: bold;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.progress-footer {
+    text-align: center;
+}
+
+.cancel-btn {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: white;
+    padding: 10px 20px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.cancel-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: translateY(-1px);
+}
+
+/* 成功模态框样式 */
+.success-header {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.success-icon {
+    width: 48px;
+    height: 48px;
+    color: #4ecdc4;
+    stroke-width: 2;
+    margin-bottom: 10px;
+}
+
+.success-header h3 {
+    color: white;
+    margin: 0;
+    font-size: 20px;
+}
+
+.success-body {
+    text-align: center;
+    margin-bottom: 25px;
+}
+
+.success-body p {
+    color: rgba(255, 255, 255, 0.9);
+    margin: 0 0 10px 0;
+    font-size: 14px;
+}
+
+.success-path {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 10px;
+    border-radius: 8px;
+    font-family: monospace;
+    font-size: 12px !important;
+    word-break: break-all;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.success-footer {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+}
+
+.primary-btn, .secondary-btn {
+    padding: 12px 24px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-size: 14px;
+    border: none;
+}
+
+.primary-btn {
+    background: linear-gradient(45deg, #4ecdc4, #44a08d);
+    color: white;
+}
+
+.primary-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(78, 205, 196, 0.3);
+}
+
+.secondary-btn {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.secondary-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: translateY(-1px);
 }

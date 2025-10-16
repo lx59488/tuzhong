@@ -3,8 +3,12 @@
 
 export function MergeFiles(arg1:string,arg2:string,arg3:string):Promise<string>;
 
+export function OpenFileLocation(arg1:string):Promise<void>;
+
+export function SelectFile():Promise<string>;
+
+export function SelectFolder():Promise<string>;
+
 export function SelectImageFile():Promise<string>;
 
 export function SelectSaveLocation(arg1:string):Promise<string>;
-
-export function SelectZipFile():Promise<string>;

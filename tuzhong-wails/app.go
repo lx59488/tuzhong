@@ -39,9 +39,14 @@ func (a *App) SelectImageFile() (string, error) {
 	return a.generator.SelectImageFile()
 }
 
-// SelectZipFile 包装后端的 SelectZipFile 方法
-func (a *App) SelectZipFile() (string, error) {
-	return a.generator.SelectZipFile()
+// SelectFile 包装后端的 SelectFile 方法
+func (a *App) SelectFile() (string, error) {
+	return a.generator.SelectFile()
+}
+
+// SelectFolder 包装后端的 SelectFolder 方法
+func (a *App) SelectFolder() (string, error) {
+	return a.generator.SelectFolder()
 }
 
 // SelectSaveLocation 包装后端的 SelectSaveLocation 方法
@@ -50,8 +55,13 @@ func (a *App) SelectSaveLocation(defaultName string) (string, error) {
 }
 
 // MergeFiles 包装后端的 MergeFiles 方法供前端访问
-func (a *App) MergeFiles(imagePath, zipPath, outputPath string) (string, error) {
-	return a.generator.MergeFiles(imagePath, zipPath, outputPath)
+func (a *App) MergeFiles(imagePath, targetPath, outputPath string) (string, error) {
+	return a.generator.MergeFiles(imagePath, targetPath, outputPath)
+}
+
+// OpenFileLocation 包装后端的 OpenFileLocation 方法
+func (a *App) OpenFileLocation(filePath string) error {
+	return a.generator.OpenFileLocation(filePath)
 }
 
 func main() {

@@ -2,7 +2,8 @@ import './style.css';
 import './app.css';
 
 import logo from './assets/images/logo-universal.png';
-import {MergeFiles, SelectImageFile, SelectZipFile, SelectSaveLocation} from '../wailsjs/go/main/App';
+import {MergeFiles, SelectImageFile, SelectFile, SelectFolder, SelectSaveLocation, OpenFileLocation} from '../wailsjs/go/main/App';
+import {EventsOn} from '../wailsjs/runtime/runtime';
 
 document.querySelector('#app').innerHTML = `
     <div class="background-animation"></div>
@@ -53,23 +54,32 @@ document.querySelector('#app').innerHTML = `
                 <div class="form-group">
                     <div class="input-label">
                         <svg class="label-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                            <path d="M12.5 2C17 2 20.5 5.5 20.5 10v5.5l-3-3h-5C8 12.5 4.5 9 4.5 4.5S8 2 12.5 2z"/>
-                            <path d="M8 21l4-7 4 7H8z"/>
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                            <polyline points="14,2 14,8 20,8"/>
+                            <line x1="16" y1="13" x2="8" y2="13"/>
+                            <line x1="16" y1="17" x2="8" y2="17"/>
                         </svg>
-                        <span>压缩包文件</span>
+                        <span>要隐藏的文件/文件夹</span>
                     </div>
                     <div class="file-input-container">
-                        <button id="selectZipBtn" class="file-btn">
-                            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                                <polyline points="7,10 12,15 17,10"/>
-                                <line x1="12" y1="15" x2="12" y2="3"/>
-                            </svg>
-                            <span>选择压缩包</span>
-                        </button>
-                        <div id="zipResult" class="file-result">
+                        <div class="button-group">
+                            <button id="selectFileBtn" class="file-btn half-width">
+                                <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                                    <polyline points="14,2 14,8 20,8"/>
+                                </svg>
+                                <span>选择文件</span>
+                            </button>
+                            <button id="selectFolderBtn" class="file-btn half-width">
+                                <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                                </svg>
+                                <span>选择文件夹</span>
+                            </button>
+                        </div>
+                        <div id="targetResult" class="file-result">
                             <span class="file-name"></span>
-                            <button class="clear-btn" onclick="clearZipSelection()">
+                            <button class="clear-btn" onclick="clearTargetSelection()">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
                                     <line x1="18" y1="6" x2="6" y2="18"/>
                                     <line x1="6" y1="6" x2="18" y2="18"/>
@@ -113,20 +123,75 @@ document.querySelector('#app').innerHTML = `
             <div id="result" class="result"></div>
         </div>
     </div>
+    
+    <!-- 进度条模态框 -->
+    <div id="progressModal" class="modal hidden">
+        <div class="modal-content">
+            <div class="progress-header">
+                <h3>生成图种</h3>
+            </div>
+            <div class="progress-body">
+                <div class="progress-text" id="progressText">准备开始...</div>
+                <div class="progress-bar-container">
+                    <div class="progress-bar" id="progressBar"></div>
+                    <div class="progress-percentage" id="progressPercentage">0%</div>
+                </div>
+            </div>
+            <div class="progress-footer">
+                <button id="cancelProgressBtn" class="cancel-btn">取消</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 成功模态框 -->
+    <div id="successModal" class="modal hidden">
+        <div class="modal-content">
+            <div class="success-header">
+                <svg class="success-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path d="M9 11l3 3L22 4"/>
+                </svg>
+                <h3>生成成功</h3>
+            </div>
+            <div class="success-body">
+                <p id="successMessage">图种文件已成功保存！</p>
+                <p class="success-path" id="successPath"></p>
+            </div>
+            <div class="success-footer">
+                <button id="openLocationBtn" class="primary-btn">打开位置</button>
+                <button id="closeSuccessBtn" class="secondary-btn">关闭</button>
+            </div>
+        </div>
+    </div>
 `;
 
 document.getElementById('logo').src = logo;
 
 let selectImageBtn = document.getElementById("selectImageBtn");
-let selectZipBtn = document.getElementById("selectZipBtn");
+let selectFileBtn = document.getElementById("selectFileBtn");
+let selectFolderBtn = document.getElementById("selectFolderBtn");
 let outputInput = document.getElementById("outputName");
 let generateBtn = document.getElementById("generateBtn");
 let resultDiv = document.getElementById("result");
 let imageResult = document.getElementById("imageResult");
-let zipResult = document.getElementById("zipResult");
+let targetResult = document.getElementById("targetResult");
+
+// 进度条相关元素
+let progressModal = document.getElementById("progressModal");
+let progressText = document.getElementById("progressText");
+let progressBar = document.getElementById("progressBar");
+let progressPercentage = document.getElementById("progressPercentage");
+let cancelProgressBtn = document.getElementById("cancelProgressBtn");
+
+// 成功模态框相关元素
+let successModal = document.getElementById("successModal");
+let successMessage = document.getElementById("successMessage");
+let successPath = document.getElementById("successPath");
+let openLocationBtn = document.getElementById("openLocationBtn");
+let closeSuccessBtn = document.getElementById("closeSuccessBtn");
 
 let selectedImagePath = "";
-let selectedZipPath = "";
+let selectedTargetPath = "";
+let currentSavePath = "";
 
 // 处理图片文件选择
 selectImageBtn.addEventListener('click', function() {
@@ -145,20 +210,37 @@ selectImageBtn.addEventListener('click', function() {
         });
 });
 
-// 处理压缩包文件选择
-selectZipBtn.addEventListener('click', function() {
-    SelectZipFile()
+// 处理文件选择
+selectFileBtn.addEventListener('click', function() {
+    SelectFile()
         .then((filePath) => {
             if (filePath) {
-                selectedZipPath = filePath;
+                selectedTargetPath = filePath;
                 const fileName = filePath.split('\\').pop().split('/').pop();
-                const fileNameSpan = zipResult.querySelector('.file-name');
-                fileNameSpan.textContent = `已选择: ${fileName}`;
-                zipResult.className = "file-result success";
+                const fileNameSpan = targetResult.querySelector('.file-name');
+                fileNameSpan.textContent = `已选择文件: ${fileName}`;
+                targetResult.className = "file-result success";
             }
         })
         .catch((err) => {
-            console.error("选择压缩包失败:", err);
+            console.error("选择文件失败:", err);
+        });
+});
+
+// 处理文件夹选择
+selectFolderBtn.addEventListener('click', function() {
+    SelectFolder()
+        .then((folderPath) => {
+            if (folderPath) {
+                selectedTargetPath = folderPath;
+                const folderName = folderPath.split('\\').pop().split('/').pop();
+                const fileNameSpan = targetResult.querySelector('.file-name');
+                fileNameSpan.textContent = `已选择文件夹: ${folderName}`;
+                targetResult.className = "file-result success";
+            }
+        })
+        .catch((err) => {
+            console.error("选择文件夹失败:", err);
         });
 });
 
@@ -171,8 +253,8 @@ generateBtn.addEventListener('click', function() {
         return;
     }
     
-    if (!selectedZipPath) {
-        showResult("请选择压缩包", "error");
+    if (!selectedTargetPath) {
+        showResult("请选择要隐藏的文件或文件夹", "error");
         return;
     }
     
@@ -181,30 +263,29 @@ generateBtn.addEventListener('click', function() {
         return;
     }
     
-    showResult("请选择保存位置...", "info");
-    
     // 让用户选择保存位置
     SelectSaveLocation(outputName)
         .then((savePath) => {
             if (savePath) {
-                showResult("正在生成图种...", "info");
-                setButtonLoading(true);
+                currentSavePath = savePath;
                 
-                return MergeFiles(selectedImagePath, selectedZipPath, savePath);
+                // 显示进度条模态框
+                showProgressModal();
+                
+                return MergeFiles(selectedImagePath, selectedTargetPath, savePath);
             } else {
                 showResult("已取消保存", "info");
                 return Promise.reject("用户取消");
             }
         })
         .then((result) => {
-            showResult(result, "success");
-            setButtonLoading(false);
+            // 不在这里处理成功，因为进度事件会处理
         })
         .catch((err) => {
             if (err !== "用户取消") {
+                hideProgressModal();
                 showResult(`生成失败: ${err}`, "error");
             }
-            setButtonLoading(false);
         });
 });
 
@@ -232,15 +313,75 @@ function clearImageSelection() {
     showResult("", "");
 }
 
-// 清除压缩包选择
-function clearZipSelection() {
-    selectedZipPath = "";
-    const fileNameSpan = zipResult.querySelector('.file-name');
+// 清除目标文件/文件夹选择
+function clearTargetSelection() {
+    selectedTargetPath = "";
+    const fileNameSpan = targetResult.querySelector('.file-name');
     fileNameSpan.textContent = "";
-    zipResult.className = "file-result";
+    targetResult.className = "file-result";
     showResult("", "");
 }
 
 // 将函数添加到全局作用域，以便HTML onclick可以调用
 window.clearImageSelection = clearImageSelection;
-window.clearZipSelection = clearZipSelection;
+window.clearTargetSelection = clearTargetSelection;
+
+// 监听后端进度事件
+EventsOn("progress", function(data) {
+    updateProgress(data.percent, data.message);
+    
+    if (data.step === "complete") {
+        setTimeout(() => {
+            hideProgressModal();
+            showSuccessModal(currentSavePath);
+        }, 500); // 显示100%一会儿后隐藏
+    }
+});
+
+// 进度条相关函数
+function showProgressModal() {
+    progressModal.classList.remove("hidden");
+    updateProgress(0, "准备开始...");
+}
+
+function hideProgressModal() {
+    progressModal.classList.add("hidden");
+}
+
+function updateProgress(percent, message) {
+    progressText.textContent = message;
+    progressBar.style.width = percent + "%";
+    progressPercentage.textContent = Math.round(percent) + "%";
+}
+
+// 成功模态框相关函数
+function showSuccessModal(filePath) {
+    const fileName = filePath.split('\\').pop().split('/').pop();
+    successMessage.textContent = "图种文件已成功保存！";
+    successPath.textContent = filePath;
+    successModal.classList.remove("hidden");
+}
+
+function hideSuccessModal() {
+    successModal.classList.add("hidden");
+}
+
+// 模态框事件处理
+cancelProgressBtn.addEventListener('click', function() {
+    hideProgressModal();
+    showResult("用户取消了操作", "info");
+});
+
+closeSuccessBtn.addEventListener('click', function() {
+    hideSuccessModal();
+});
+
+openLocationBtn.addEventListener('click', function() {
+    if (currentSavePath) {
+        OpenFileLocation(currentSavePath)
+            .catch((err) => {
+                console.error("打开文件位置失败:", err);
+            });
+    }
+    hideSuccessModal();
+});
