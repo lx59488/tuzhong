@@ -9,5 +9,12 @@
   "author": {
     "name": "lixin",
     "email": "lixin@goldmatrix.cn"
+  },
+  "info": {
+    "productName": "图种生成器",
+    "productVersion": "1.0.0",
+    "companyName": "图种工具",
+    "copyright": "© 2024 图种生成器",
+    "comments": "图种生成器 - 将文件隐藏到图片中的工具"
   }
 }

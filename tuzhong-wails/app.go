@@ -59,6 +59,11 @@ func (a *App) SelectSaveLocation(defaultName string) (string, error) {
 	return a.generator.SelectSaveLocation(defaultName)
 }
 
+// SelectExtractLocation 包装后端的 SelectExtractLocation 方法
+func (a *App) SelectExtractLocation(suggestedName string) (string, error) {
+	return a.generator.SelectExtractLocation(suggestedName)
+}
+
 // MergeFiles 包装后端的 MergeFiles 方法供前端访问
 func (a *App) MergeFiles(imagePath, targetPath, outputPath string) (string, error) {
 	return a.generator.MergeFiles(imagePath, targetPath, outputPath)
@@ -67,6 +72,21 @@ func (a *App) MergeFiles(imagePath, targetPath, outputPath string) (string, erro
 // OpenFileLocation 包装后端的 OpenFileLocation 方法
 func (a *App) OpenFileLocation(filePath string) error {
 	return a.generator.OpenFileLocation(filePath)
+}
+
+// SelectTuzhongFile 包装后端的 SelectTuzhongFile 方法
+func (a *App) SelectTuzhongFile() (string, error) {
+	return a.generator.SelectTuzhongFile()
+}
+
+// AnalyzeTuzhong 包装后端的 AnalyzeTuzhong 方法
+func (a *App) AnalyzeTuzhong(tuzhongPath string) (*backend.TuzhongInfo, error) {
+	return a.generator.AnalyzeTuzhong(tuzhongPath)
+}
+
+// ExtractFromTuzhong 包装后端的 ExtractFromTuzhong 方法
+func (a *App) ExtractFromTuzhong(tuzhongPath, outputDir string) error {
+	return a.generator.ExtractFromTuzhong(tuzhongPath, outputDir)
 }
 
 func main() {
@@ -84,6 +104,17 @@ func main() {
 		MaxHeight: 1000,
 		AssetServer: &assetserver.Options{
 			Assets: assets,
+		},
+		// 优化窗口行为，防止标题栏和图标跳动
+		DisableResize:     false,
+		Fullscreen:        false,
+		HideWindowOnClose: false,
+		AlwaysOnTop:       false,
+		WindowStartState:  options.Normal,
+		// 固定窗口属性，防止重绘时的视觉问题
+		SingleInstanceLock: &options.SingleInstanceLock{
+			UniqueId:               "com.tuzhong.generator",
+			OnSecondInstanceLaunch: nil,
 		},
 		OnStartup: app.startup,
 		Bind: []interface{}{

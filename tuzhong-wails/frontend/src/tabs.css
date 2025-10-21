@@ -1,0 +1,185 @@
+/* 标签页导航样式 */
+.tab-navigation {
+    display: flex;
+    gap: 0;
+    margin-bottom: 25px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    padding: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.tab-btn {
+    flex: 1;
+    padding: 12px 20px;
+    border: none;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.7);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.tab-btn svg {
+    width: 18px;
+    height: 18px;
+    stroke-width: 2;
+}
+
+.tab-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.tab-btn.active {
+    background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
+    color: white;
+    box-shadow: 0 4px 15px rgba(78, 205, 196, 0.3);
+}
+
+/* 标签页面板样式 */
+.tab-panel {
+    display: none;
+}
+
+.tab-panel.active {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+/* 图种信息显示样式 */
+.tuzhong-info {
+    margin-top: 20px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 12px;
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.tuzhong-info.hidden {
+    display: none;
+}
+
+.info-header {
+    padding: 12px 16px;
+    background: rgba(255, 255, 255, 0.05);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 14px;
+}
+
+.info-header svg {
+    width: 16px;
+    height: 16px;
+    stroke-width: 2;
+    color: #4ecdc4;
+}
+
+.info-content {
+    padding: 16px;
+}
+
+.info-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 12px;
+    font-size: 13px;
+}
+
+.info-item:last-child {
+    margin-bottom: 0;
+}
+
+.info-label {
+    color: rgba(255, 255, 255, 0.7);
+    font-weight: 500;
+    min-width: 80px;
+}
+
+.info-item span:last-child {
+    color: rgba(255, 255, 255, 0.9);
+    font-weight: 400;
+    text-align: right;
+}
+
+.files-list {
+    flex-direction: column;
+    align-items: stretch;
+}
+
+.files-list .info-label {
+    margin-bottom: 8px;
+}
+
+.files-container {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 6px;
+    padding: 8px;
+    max-height: 150px;
+    overflow-y: auto;
+}
+
+.file-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0;
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 12px;
+}
+
+.file-item svg {
+    width: 14px;
+    height: 14px;
+    stroke-width: 2;
+    color: #4ecdc4;
+    flex-shrink: 0;
+}
+
+.no-files {
+    color: rgba(255, 255, 255, 0.5);
+    font-style: italic;
+    text-align: center;
+    padding: 8px;
+}
+
+/* 次要按钮样式 */
+.generate-btn.secondary {
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.6);
+    cursor: not-allowed;
+}
+
+.generate-btn.secondary:disabled {
+    background: rgba(255, 255, 255, 0.05);
+    color: rgba(255, 255, 255, 0.4);
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+.generate-btn.secondary:disabled:hover {
+    background: rgba(255, 255, 255, 0.05);
+    transform: none;
+    box-shadow: none;
+}
+
+.tab-content {
+    padding: 20px;
+    border-top: 1px solid #334155;
+    background-color: #1e293b;
+    flex-grow: 1; /* 确保内容区域填充可用空间 */
+}

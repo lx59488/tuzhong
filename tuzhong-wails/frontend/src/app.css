@@ -1,19 +1,43 @@
+* {
+    box-sizing: border-box;
+}
+
+/* 基本页面设置 */
+html, body {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    font-family: "Nunito", sans-serif;
+    color: #e2e8f0;
+    background-color: #1e293b;
+    overflow: hidden; /* 防止根元素滚动 */
+}
+
+#app {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+}
+
 /* 容器和布局 */
 .container {
+    width: 100%;
     max-width: 750px;
-    margin: 0 auto;
-    padding: 30px 20px;
-    position: relative;
-    min-height: 100vh;
+    max-height: 100%;
     display: flex;
     flex-direction: column;
-    justify-content: center;
+    overflow: hidden; /* 防止容器本身溢出 */
 }
 
 /* 头部区域 */
 .header {
     margin-bottom: 20px;
     text-align: center;
+    flex-shrink: 0; /* 防止头部在空间不足时被压缩 */
 }
 
 .logo-container {
@@ -90,7 +114,8 @@
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
     transition: all 0.3s ease;
     width: 100%;
-    max-width: 100%;
+    overflow-y: auto; /* 使内容区域可滚动 */
+    flex-grow: 1; /* 占据剩余空间 */
 }
 
 .main-content:hover {
@@ -580,7 +605,7 @@
     }
 }
 
-/* 模态框样式 */
+/* 模态框样式 - 防止影响窗口标题栏 */
 .modal {
     position: fixed;
     top: 0;
@@ -594,11 +619,17 @@
     justify-content: center;
     z-index: 1000;
     transition: opacity 0.3s ease;
+    /* 防止模态框影响页面布局 */
+    pointer-events: auto;
+    contain: layout style paint; /* 隔离布局影响 */
+    will-change: opacity; /* 优化动画性能 */
 }
 
 .modal.hidden {
     opacity: 0;
     pointer-events: none;
+    /* 完全隐藏时不占用渲染资源 */
+    display: none;
 }
 
 .modal-content {
@@ -612,6 +643,9 @@
     box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
     transform: scale(0.9);
     transition: transform 0.3s ease;
+    /* 防止内容变化影响外部布局 */
+    contain: layout style paint;
+    will-change: transform;
 }
 
 .modal:not(.hidden) .modal-content {
@@ -640,6 +674,9 @@
     height: 20px;
     margin-bottom: 20px;
     overflow: hidden;
+    /* 启用硬件加速减少重绘 */
+    will-change: transform;
+    transform: translateZ(0);
 }
 
 .progress-bar {
@@ -647,8 +684,12 @@
     height: 100%;
     width: 0%;
     border-radius: 10px;
-    transition: width 0.3s ease;
+    /* 优化动画性能，减少UI跳动 */
+    transition: width 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     position: relative;
+    /* 启用硬件加速 */
+    will-change: width;
+    transform: translateZ(0);
 }
 
 .progress-bar::after {
@@ -660,6 +701,9 @@
     bottom: 0;
     background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
     animation: shimmer 2s infinite;
+    /* 减少动画对性能的影响 */
+    will-change: transform;
+    transform: translateZ(0);
 }
 
 @keyframes shimmer {

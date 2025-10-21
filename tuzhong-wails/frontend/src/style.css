@@ -1,8 +1,6 @@
 html {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     text-align: center;
     color: white;
-    overflow-x: hidden;
 }
 
 body {
@@ -11,8 +9,6 @@ body {
     font-family: "Nunito", -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto",
     "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue",
     sans-serif;
-    min-height: 100vh;
-    position: relative;
 }
 
 @font-face {
@@ -95,7 +91,7 @@ body {
 
 /* 全局动画优化 */
 * {
-    box-sizing: border-box;
+    will-change: transform, opacity;
 }
 
 /* 选中文本颜色 */
