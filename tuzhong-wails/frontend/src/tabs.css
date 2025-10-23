@@ -9,6 +9,60 @@
     border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
+body.theme-light .tab-navigation {
+    background: rgba(15, 23, 42, 0.06);
+    border: 1px solid rgba(15, 23, 42, 0.1);
+}
+
+body.theme-light .tab-btn {
+    color: rgba(15, 23, 42, 0.65);
+}
+
+body.theme-light .tab-btn:hover {
+    background: rgba(78, 205, 196, 0.14);
+    color: rgba(15, 23, 42, 0.85);
+}
+
+body.theme-light .tab-btn.active {
+    box-shadow: 0 6px 16px rgba(255, 107, 107, 0.25);
+}
+
+body.theme-light .tuzhong-info {
+    background: rgba(255, 255, 255, 0.92);
+    border: 1px solid rgba(15, 23, 42, 0.12);
+}
+
+body.theme-light .info-header {
+    background: rgba(15, 23, 42, 0.05);
+    border-bottom: 1px solid rgba(15, 23, 42, 0.12);
+    color: rgba(15, 23, 42, 0.85);
+}
+
+body.theme-light .info-item {
+    color: rgba(15, 23, 42, 0.75);
+}
+
+body.theme-light .info-label {
+    color: rgba(15, 23, 42, 0.7);
+}
+
+body.theme-light .info-item span:last-child {
+    color: rgba(15, 23, 42, 0.82);
+}
+
+body.theme-light .files-container {
+    background: rgba(15, 23, 42, 0.05);
+    border: 1px solid rgba(15, 23, 42, 0.1);
+}
+
+body.theme-light .file-item {
+    color: rgba(15, 23, 42, 0.75);
+}
+
+body.theme-light .no-files {
+    color: rgba(15, 23, 42, 0.5);
+}
+
 .tab-btn {
     flex: 1;
     padding: 12px 20px;

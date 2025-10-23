@@ -2,6 +2,7 @@ package backend
 
 import (
 	"archive/zip"
+	"bytes"
 	"context"
 	"encoding/base64"
 	"fmt"
@@ -413,6 +414,14 @@ func (g *Generator) createZipWithProgress(sourcePath, zipPath string) error {
 
 // 打开文件所在位置的方法
 func (g *Generator) OpenFileLocation(filePath string) error {
+	if filePath == "" {
+		return fmt.Errorf("路径为空")
+	}
+	info, err := os.Stat(filePath)
+	if err == nil && info.IsDir() {
+		runtime.BrowserOpenURL(g.ctx, "file://"+filePath)
+		return nil
+	}
 	runtime.BrowserOpenURL(g.ctx, "file://"+filepath.Dir(filePath))
 	return nil
 }
@@ -470,6 +479,10 @@ func (g *Generator) AnalyzeTuzhong(tuzhongPath string) (*TuzhongInfo, error) {
 	info.ImageSize = imageSize
 	info.ImageFormat = imageFormat
 
+	// 调试信息：添加更详细的size信息
+	fmt.Printf("图片文件总大小: %d, 检测到的图片大小: %d, 图片格式: %s\n",
+		len(data), imageSize, imageFormat)
+
 	// 检查是否有隐藏数据
 	if int64(len(data)) <= imageSize {
 		info.IsValid = false
@@ -483,11 +496,56 @@ func (g *Generator) AnalyzeTuzhong(tuzhongPath string) (*TuzhongInfo, error) {
 	hiddenData := data[imageSize:]
 	info.HiddenSize = int64(len(hiddenData))
 
+	// 调试信息：显示隐藏数据的前几个字节
+	if len(hiddenData) >= 10 {
+		fmt.Printf("隐藏数据大小: %d, 前10字节: %x\n", len(hiddenData), hiddenData[:10])
+	} else if len(hiddenData) > 0 {
+		fmt.Printf("隐藏数据大小: %d, 所有字节: %x\n", len(hiddenData), hiddenData)
+	}
+
+	// 验证zip数据的基本结构
+	if len(hiddenData) < 4 {
+		info.IsValid = false
+		info.ErrorMessage = "隐藏数据太小，不是有效的zip文件"
+		return info, nil
+	}
+
+	// 检查zip文件头（更宽松的检测）
+	hasValidZipSignature := false
+	if len(hiddenData) >= 4 && hiddenData[0] == 0x50 && hiddenData[1] == 0x4B {
+		// PK签名存在，检查各种可能的zip结构
+		if (hiddenData[2] == 0x03 && hiddenData[3] == 0x04) || // Local file header
+			(hiddenData[2] == 0x01 && hiddenData[3] == 0x02) || // Central directory file header
+			(hiddenData[2] == 0x05 && hiddenData[3] == 0x06) || // End of central directory record
+			(hiddenData[2] == 0x07 && hiddenData[3] == 0x08) { // Data descriptor
+			hasValidZipSignature = true
+		}
+	}
+
+	// 如果没有找到PK签名，尝试查找zip文件的其他部分
+	if !hasValidZipSignature && len(hiddenData) >= 22 {
+		// 查找End of Central Directory Record
+		for i := len(hiddenData) - 22; i >= 0; i-- {
+			if len(hiddenData) >= i+4 &&
+				hiddenData[i] == 0x50 && hiddenData[i+1] == 0x4B &&
+				hiddenData[i+2] == 0x05 && hiddenData[i+3] == 0x06 {
+				hasValidZipSignature = true
+				break
+			}
+		}
+	}
+
+	if !hasValidZipSignature {
+		info.IsValid = false
+		info.ErrorMessage = "隐藏数据不包含有效的zip文件签名"
+		return info, nil
+	}
+
 	// 尝试解析zip内容
 	files, err := g.analyzeZipData(hiddenData)
 	if err != nil {
 		info.IsValid = false
-		info.ErrorMessage = "解析隐藏数据失败，可能不是一个有效的图种文件。"
+		info.ErrorMessage = fmt.Sprintf("解析隐藏数据失败: %v", err)
 		// 同样，返回 info 对象供前端判断
 		return info, nil
 	}
@@ -570,19 +628,32 @@ func (g *Generator) detectImageInfo(data []byte) (int64, string, error) {
 	// JPEG
 	if len(data) >= 2 && data[0] == 0xFF && data[1] == 0xD8 {
 		// 查找JPEG结束标记 FF D9
-		for i := len(data) - 2; i >= 0; i-- {
+		// 从后往前查找，因为图种的zip数据在图片之后
+		for i := len(data) - 2; i >= 2; i-- {
 			if data[i] == 0xFF && data[i+1] == 0xD9 {
-				return int64(i + 2), "JPEG", nil
+				// 找到了JPEG结束标记
+				jpegSize := int64(i + 2)
+				// 验证这个位置之后是否有数据
+				if jpegSize < int64(len(data)) {
+					// 检查后面的数据是否看起来像zip
+					remaining := data[jpegSize:]
+					if len(remaining) >= 4 && remaining[0] == 0x50 && remaining[1] == 0x4B {
+						return jpegSize, "JPEG", nil
+					}
+				}
 			}
 		}
+		// 如果没找到合理的结束标记，可能整个文件都是图片
 		return int64(len(data)), "JPEG", nil
 	}
 
 	// PNG
 	if len(data) >= 8 && data[0] == 0x89 && data[1] == 0x50 && data[2] == 0x4E && data[3] == 0x47 {
-		// 查找PNG结束标记 IEND
-		for i := len(data) - 12; i >= 0; i-- {
-			if string(data[i:i+4]) == "IEND" {
+		// PNG的结构更复杂，查找IEND chunk
+		for i := len(data) - 12; i >= 8; i-- {
+			if i+8 <= len(data) && string(data[i:i+4]) == "IEND" {
+				// IEND chunk包含4字节长度 + 4字节类型 + 4字节CRC = 12字节
+				// 但实际上IEND的长度字段是0，所以是0+4+4 = 8字节
 				return int64(i + 8), "PNG", nil
 			}
 		}
@@ -592,7 +663,7 @@ func (g *Generator) detectImageInfo(data []byte) (int64, string, error) {
 	// GIF
 	if len(data) >= 6 && (string(data[0:6]) == "GIF87a" || string(data[0:6]) == "GIF89a") {
 		// GIF以 0x3B 结束
-		for i := len(data) - 1; i >= 0; i-- {
+		for i := len(data) - 1; i >= 6; i-- {
 			if data[i] == 0x3B {
 				return int64(i + 1), "GIF", nil
 			}
@@ -600,13 +671,43 @@ func (g *Generator) detectImageInfo(data []byte) (int64, string, error) {
 		return int64(len(data)), "GIF", nil
 	}
 
+	// WebP
+	if len(data) >= 12 && string(data[0:4]) == "RIFF" && string(data[8:12]) == "WEBP" {
+		// WebP文件大小在第4-7字节（小端序）
+		size := uint32(data[4]) | uint32(data[5])<<8 | uint32(data[6])<<16 | uint32(data[7])<<24
+		webpSize := int64(size + 8) // +8 for RIFF header
+		if webpSize <= int64(len(data)) {
+			return webpSize, "WEBP", nil
+		}
+		return int64(len(data)), "WEBP", nil
+	}
+
+	// BMP
+	if len(data) >= 14 && data[0] == 0x42 && data[1] == 0x4D {
+		// BMP文件大小在第2-5字节（小端序）
+		size := uint32(data[2]) | uint32(data[3])<<8 | uint32(data[4])<<16 | uint32(data[5])<<24
+		if int64(size) <= int64(len(data)) && size > 0 {
+			return int64(size), "BMP", nil
+		}
+		return int64(len(data)), "BMP", nil
+	}
+
 	return 0, "", fmt.Errorf("不支持的图片格式")
 }
 
 // 分析zip数据内容
 func (g *Generator) analyzeZipData(zipData []byte) ([]string, error) {
+	if len(zipData) < 22 {
+		return nil, fmt.Errorf("zip数据太小，至少需要22字节")
+	}
+
+	// 验证zip文件结构
+	if err := g.validateZipData(zipData); err != nil {
+		return nil, fmt.Errorf("zip文件验证失败: %v", err)
+	}
+
 	// 创建内存中的zip读取器
-	reader, err := zip.NewReader(strings.NewReader(string(zipData)), int64(len(zipData)))
+	reader, err := zip.NewReader(bytes.NewReader(zipData), int64(len(zipData)))
 	if err != nil {
 		return nil, fmt.Errorf("无法解析zip数据: %v", err)
 	}
@@ -619,12 +720,62 @@ func (g *Generator) analyzeZipData(zipData []byte) ([]string, error) {
 	return files, nil
 }
 
+// 验证zip文件数据结构
+func (g *Generator) validateZipData(data []byte) error {
+	// 查找End of Central Directory Record (EOCD)
+	// EOCD signature: 0x06054b50
+	eocdPos := -1
+	for i := len(data) - 22; i >= 0; i-- {
+		if len(data) >= i+4 &&
+			data[i] == 0x50 && data[i+1] == 0x4B &&
+			data[i+2] == 0x05 && data[i+3] == 0x06 {
+			eocdPos = i
+			break
+		}
+	}
+
+	if eocdPos == -1 {
+		return fmt.Errorf("找不到zip文件的中央目录结束记录")
+	}
+
+	// 验证EOCD记录的完整性
+	if len(data) < eocdPos+22 {
+		return fmt.Errorf("zip文件的中央目录结束记录不完整")
+	}
+
+	// 提取中央目录的偏移量和大小
+	cdOffset := uint32(data[eocdPos+16]) | uint32(data[eocdPos+17])<<8 |
+		uint32(data[eocdPos+18])<<16 | uint32(data[eocdPos+19])<<24
+	cdSize := uint32(data[eocdPos+12]) | uint32(data[eocdPos+13])<<8 |
+		uint32(data[eocdPos+14])<<16 | uint32(data[eocdPos+15])<<24
+
+	// 验证偏移量的合理性
+	if cdOffset >= uint32(len(data)) {
+		return fmt.Errorf("中央目录偏移量超出文件范围: %d >= %d", cdOffset, len(data))
+	}
+
+	if cdOffset+cdSize > uint32(len(data)) {
+		return fmt.Errorf("中央目录超出文件范围: %d + %d > %d", cdOffset, cdSize, len(data))
+	}
+
+	return nil
+}
+
 // 提取zip数据到目录
 func (g *Generator) extractZipData(zipData []byte, outputDir string) error {
+	if len(zipData) < 22 {
+		return fmt.Errorf("zip数据太小，至少需要22字节")
+	}
+
+	// 验证zip文件结构
+	if err := g.validateZipData(zipData); err != nil {
+		return fmt.Errorf("zip文件验证失败: %v", err)
+	}
+
 	// 创建内存中的zip读取器
-	reader, err := zip.NewReader(strings.NewReader(string(zipData)), int64(len(zipData)))
+	reader, err := zip.NewReader(bytes.NewReader(zipData), int64(len(zipData)))
 	if err != nil {
-		return fmt.Errorf("无法解析zip数据: %v", err)
+		return fmt.Errorf("打开zip文件失败: %v", err)
 	}
 
 	totalFiles := len(reader.File)

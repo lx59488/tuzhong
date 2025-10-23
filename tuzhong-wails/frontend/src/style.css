@@ -99,3 +99,16 @@ body {
     background: rgba(78, 205, 196, 0.3);
     color: white;
 }
+
+body.theme-light {
+    color: #1f2933;
+}
+
+body.theme-light #app {
+    color: inherit;
+}
+
+body.theme-light ::selection {
+    background: rgba(78, 205, 196, 0.2);
+    color: #1f2933;
+}

@@ -3,8 +3,8 @@ import './app.css';
 import './tabs.css';
 
 import logo from './assets/images/logo-universal.png';
-import {MergeFiles, SelectImageFile, SelectFile, SelectFolder, SelectSaveLocation, OpenFileLocation, GetImageBase64, SelectTuzhongFile, AnalyzeTuzhong, ExtractFromTuzhong, SelectExtractLocation} from '../wailsjs/go/main/App';
-import {EventsOn} from '../wailsjs/runtime/runtime';
+import {MergeFiles, SelectImageFile, SelectFolder, SelectSaveLocation, OpenFileLocation, GetImageBase64, SelectTuzhongFile, AnalyzeTuzhong, ExtractFromTuzhong, SelectExtractLocation, SelectFile} from '../wailsjs/go/main/App';
+import {EventsOn, OnFileDrop, WindowSetDarkTheme, WindowSetLightTheme} from '../wailsjs/runtime/runtime';
 
 // 防止页面重排导致窗口标题栏跳动
 /*
@@ -27,14 +27,33 @@ document.querySelector('#app').innerHTML = `
     <div class="background-animation"></div>
     <div class="container">
         <div class="header">
-            <div class="logo-container">
-                <img id="logo" class="logo" />
-                <div class="logo-glow"></div>
+            <div class="header-main">
+                <div class="logo-container">
+                    <img id="logo" class="logo" />
+                    <div class="logo-glow"></div>
+                </div>
+                <h1 class="title">
+                    <span class="title-text">图种生成器</span>
+                    <span class="title-subtitle">Image Seed Generator</span>
+                </h1>
             </div>
-            <h1 class="title">
-                <span class="title-text">图种生成器</span>
-                <span class="title-subtitle">Image Seed Generator</span>
-            </h1>
+            <button id="themeToggle" class="theme-toggle-btn" aria-label="切换主题">
+                <svg class="theme-icon theme-icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <circle cx="12" cy="12" r="5"/>
+                    <line x1="12" y1="1" x2="12" y2="3"/>
+                    <line x1="12" y1="21" x2="12" y2="23"/>
+                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+                    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+                    <line x1="1" y1="12" x2="3" y2="12"/>
+                    <line x1="21" y1="12" x2="23" y2="12"/>
+                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+                    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+                </svg>
+                <svg class="theme-icon theme-icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path d="M21 12.79A9 9 0 0 1 11.21 3 7 7 0 1 0 21 12.79z"/>
+                </svg>
+                <span class="theme-toggle-text">浅色模式</span>
+            </button>
         </div>
         
         <div class="main-content">
@@ -72,7 +91,7 @@ document.querySelector('#app').innerHTML = `
                         </svg>
                         <span>封面图片</span>
                     </div>
-                    <div class="file-input-container">
+                    <div class="file-input-container drop-target" data-drop-target="image">
                         <button id="selectImageBtn" class="file-btn">
                             <div class="btn-content">
                                 <div class="btn-left">
@@ -115,7 +134,7 @@ document.querySelector('#app').innerHTML = `
                         </svg>
                         <span>要隐藏的文件/文件夹</span>
                     </div>
-                    <div class="file-input-container">
+                    <div class="file-input-container drop-target" data-drop-target="target">
                         <div class="button-group">
                             <button id="selectFileBtn" class="file-btn half-width">
                                 <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -189,7 +208,7 @@ document.querySelector('#app').innerHTML = `
                             </svg>
                             <span>选择图种文件</span>
                         </div>
-                        <div class="file-input-container">
+                        <div class="file-input-container drop-target" data-drop-target="tuzhong">
                             <button id="selectTuzhongBtn" class="file-btn">
                                 <div class="btn-content">
                                     <div class="btn-left">
@@ -293,9 +312,62 @@ document.querySelector('#app').innerHTML = `
                 <h3>生成图种</h3>
             </div>
             <div class="progress-body">
-                <div class="progress-text" id="progressText">准备开始...</div>
+                <div class="progress-stage" id="progressStage">准备开始...</div>
+                <div class="progress-steps" id="progressStepsCreate">
+                    <div class="progress-step active" data-step="start">
+                        <div class="step-circle">1</div>
+                        <span class="step-label">准备</span>
+                    </div>
+                    <div class="progress-step" data-step="compress">
+                        <div class="step-circle">2</div>
+                        <span class="step-label">压缩</span>
+                    </div>
+                    <div class="progress-step" data-step="merge">
+                        <div class="step-circle">3</div>
+                        <span class="step-label">合并</span>
+                    </div>
+                    <div class="progress-step" data-step="complete">
+                        <div class="step-circle">4</div>
+                        <span class="step-label">完成</span>
+                    </div>
+                </div>
+                <div class="progress-steps hidden" id="progressStepsExtract">
+                    <div class="progress-step active" data-step="start">
+                        <div class="step-circle">1</div>
+                        <span class="step-label">准备</span>
+                    </div>
+                    <div class="progress-step" data-step="analyze">
+                        <div class="step-circle">2</div>
+                        <span class="step-label">解析</span>
+                    </div>
+                    <div class="progress-step" data-step="extract">
+                        <div class="step-circle">3</div>
+                        <span class="step-label">提取</span>
+                    </div>
+                    <div class="progress-step" data-step="complete">
+                        <div class="step-circle">4</div>
+                        <span class="step-label">完成</span>
+                    </div>
+                </div>
+                <div class="progress-detail" id="progressDetail"></div>
+                <div class="progress-info">
+                    <div class="progress-info-item">
+                        <span class="info-label">文件大小:</span>
+                        <span class="info-value" id="fileSize">计算中...</span>
+                    </div>
+                    <div class="progress-info-item">
+                        <span class="info-label">处理速度:</span>
+                        <span class="info-value" id="processSpeed">--</span>
+                    </div>
+                    <div class="progress-info-item">
+                        <span class="info-label">剩余时间:</span>
+                        <span class="info-value" id="remainingTime">计算中...</span>
+                    </div>
+                </div>
                 <div class="progress-bar-container">
-                    <div class="progress-bar" id="progressBar"></div>
+                    <div class="progress-bar" id="progressBar">
+                        <div class="progress-bar-glow"></div>
+                    </div>
                     <div class="progress-percentage" id="progressPercentage">0%</div>
                 </div>
             </div>
@@ -340,6 +412,7 @@ let targetResult = document.getElementById("targetResult");
 let miniPreviewContainer = document.getElementById("miniPreviewContainer");
 let miniPreviewImage = document.getElementById("miniPreviewImage");
 let miniPreviewLoading = document.querySelector(".mini-preview-loading");
+let themeToggleBtn = document.getElementById("themeToggle");
 
 // 解析功能相关元素
 let selectTuzhongBtn = document.getElementById("selectTuzhongBtn");
@@ -360,10 +433,14 @@ let extractPanel = document.getElementById("extractPanel");
 
 // 进度条相关元素
 let progressModal = document.getElementById("progressModal");
-let progressText = document.getElementById("progressText");
+let progressStage = document.getElementById("progressStage");
+let progressDetail = document.getElementById("progressDetail");
 let progressBar = document.getElementById("progressBar");
 let progressPercentage = document.getElementById("progressPercentage");
 let cancelProgressBtn = document.getElementById("cancelProgressBtn");
+let progressStepsCreate = document.getElementById("progressStepsCreate");
+let progressStepsExtract = document.getElementById("progressStepsExtract");
+let progressHeaderTitle = progressModal ? progressModal.querySelector('.progress-header h3') : null;
 
 // 成功模态框相关元素
 let successModal = document.getElementById("successModal");
@@ -371,12 +448,34 @@ let successMessage = document.getElementById("successMessage");
 let successPath = document.getElementById("successPath");
 let openLocationBtn = document.getElementById("openLocationBtn");
 let closeSuccessBtn = document.getElementById("closeSuccessBtn");
+let successTitle = successModal ? successModal.querySelector('.success-header h3') : null;
 
 let selectedImagePath = "";
 let selectedTargetPath = "";
 let selectedTuzhongPath = "";
 let currentSavePath = "";
 let currentTuzhongInfo = null;
+
+const THEME_STORAGE_KEY = "tuzhong-theme";
+let currentTheme = "theme-dark";
+const ACCEPTED_IMAGE_EXTENSIONS = [".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp"];
+const progressSequences = {
+    create: ["start", "compress", "merge", "complete"],
+    extract: ["start", "analyze", "extract", "complete"],
+};
+const PROGRESS_MESSAGES = {
+    start: "准备开始...",
+    compress: "正在压缩文件...",
+    merge: "正在生成图种...",
+    analyze: "正在解析图种结构...",
+    extract: "正在提取隐藏文件...",
+    complete: "操作完成！",
+};
+let currentProgressMode = "create";
+const progressStepContainers = {
+    create: progressStepsCreate,
+    extract: progressStepsExtract,
+};
 
 // 标签页切换功能
 createTab.addEventListener('click', function() {
@@ -412,14 +511,7 @@ selectImageBtn.addEventListener('click', function() {
         .then((filePath) => {
             if (filePath) {
                 console.log("选择的图片路径:", filePath);
-                selectedImagePath = filePath;
-                const fileName = filePath.split('\\').pop().split('/').pop();
-                const fileNameSpan = imageResult.querySelector('.file-name');
-                fileNameSpan.textContent = `已选择: ${fileName}`;
-                imageResult.className = "file-result success";
-                
-                // 显示小图预览
-                showMiniPreview(filePath);
+                handleImageSelection(filePath);
             }
         })
         .catch((err) => {
@@ -433,11 +525,7 @@ selectFileBtn.addEventListener('click', function() {
     SelectFile()
         .then((filePath) => {
             if (filePath) {
-                selectedTargetPath = filePath;
-                const fileName = filePath.split('\\').pop().split('/').pop();
-                const fileNameSpan = targetResult.querySelector('.file-name');
-                fileNameSpan.textContent = `已选择文件: ${fileName}`;
-                targetResult.className = "file-result success";
+                setTargetSelection(filePath, "file");
             }
         })
         .catch((err) => {
@@ -450,11 +538,7 @@ selectFolderBtn.addEventListener('click', function() {
     SelectFolder()
         .then((folderPath) => {
             if (folderPath) {
-                selectedTargetPath = folderPath;
-                const folderName = folderPath.split('\\').pop().split('/').pop();
-                const fileNameSpan = targetResult.querySelector('.file-name');
-                fileNameSpan.textContent = `已选择文件夹: ${folderName}`;
-                targetResult.className = "file-result success";
+                setTargetSelection(folderPath, "folder");
             }
         })
         .catch((err) => {
@@ -468,19 +552,7 @@ selectTuzhongBtn.addEventListener('click', function() {
         .then((filePath) => {
             if (filePath) {
                 console.log("选择的图种文件路径:", filePath);
-                selectedTuzhongPath = filePath;
-                const fileName = filePath.split('\\').pop().split('/').pop();
-                const fileNameSpan = tuzhongResult.querySelector('.file-name');
-                fileNameSpan.textContent = `已选择: ${fileName}`;
-                tuzhongResult.className = "file-result success";
-                
-                // 显示图种预览
-                showTuzhongMiniPreview(filePath);
-                
-                // 重置信息显示
-                tuzhongInfo.classList.add("hidden");
-                extractBtn.disabled = true;
-                extractBtn.classList.add("secondary");
+                handleTuzhongSelection(filePath);
             }
         })
         .catch((err) => {
@@ -544,7 +616,7 @@ extractBtn.addEventListener('click', function() {
         .then((extractPath) => {
             if (extractPath) {
                 // 显示进度条模态框
-                showProgressModal();
+                showProgressModal("extract");
                 
                 return ExtractFromTuzhong(selectedTuzhongPath, extractPath)
                     .then(() => {
@@ -589,7 +661,7 @@ generateBtn.addEventListener('click', function() {
                 currentSavePath = savePath;
                 
                 // 显示进度条模态框
-                showProgressModal();
+                showProgressModal("create");
                 
                 return MergeFiles(selectedImagePath, selectedTargetPath, savePath);
             } else {
@@ -607,6 +679,79 @@ generateBtn.addEventListener('click', function() {
             }
         });
 });
+
+function handleImageSelection(filePath) {
+    if (!filePath) {
+        return;
+    }
+    if (!isSupportedImage(filePath)) {
+        showResult("请选择有效的图片文件（支持 PNG/JPG/GIF/BMP/WEBP）", "error");
+        return;
+    }
+    setImageSelection(filePath);
+}
+
+function setImageSelection(filePath) {
+    selectedImagePath = filePath;
+    const fileNameSpan = imageResult.querySelector('.file-name');
+    fileNameSpan.textContent = `已选择: ${extractFileName(filePath)}`;
+    imageResult.className = "file-result success";
+    showMiniPreview(filePath);
+    showResult("", "");
+}
+
+function handleTuzhongSelection(filePath) {
+    if (!filePath) {
+        return;
+    }
+    if (!isSupportedImage(filePath)) {
+        showExtractResult("请选择有效的图片文件", "error");
+        return;
+    }
+    setTuzhongSelection(filePath);
+}
+
+function setTuzhongSelection(filePath) {
+    selectedTuzhongPath = filePath;
+    const fileNameSpan = tuzhongResult.querySelector('.file-name');
+    fileNameSpan.textContent = `已选择: ${extractFileName(filePath)}`;
+    tuzhongResult.className = "file-result success";
+    currentTuzhongInfo = null;
+    showTuzhongMiniPreview(filePath);
+    tuzhongInfo.classList.add("hidden");
+    extractBtn.disabled = true;
+    extractBtn.classList.add("secondary");
+    showExtractResult("", "");
+}
+
+function setTargetSelection(path, type = "auto") {
+    if (!path) {
+        return;
+    }
+    selectedTargetPath = path;
+    const fileNameSpan = targetResult.querySelector('.file-name');
+    const fileName = extractFileName(path);
+    let prefix = "已选择:";
+    if (type === "file") {
+        prefix = "已选择文件:";
+    } else if (type === "folder") {
+        prefix = "已选择文件夹:";
+    }
+    fileNameSpan.textContent = `${prefix} ${fileName}`;
+    targetResult.className = "file-result success";
+    showResult("", "");
+}
+
+function extractFileName(filePath) {
+    const normalized = filePath.replace(/\\/g, '/');
+    const segments = normalized.split('/');
+    return segments.pop() || filePath;
+}
+
+function isSupportedImage(filePath) {
+    const lower = filePath.toLowerCase();
+    return ACCEPTED_IMAGE_EXTENSIONS.some(ext => lower.endsWith(ext));
+}
 
 function setButtonLoading(loading) {
     if (loading) {
@@ -835,6 +980,7 @@ function hideTuzhongMiniPreview() {
 // 清除图种选择
 function clearTuzhongSelection() {
     selectedTuzhongPath = "";
+    currentTuzhongInfo = null;
     const fileNameSpan = tuzhongResult.querySelector('.file-name');
     fileNameSpan.textContent = "";
     tuzhongResult.className = "file-result";
@@ -846,7 +992,7 @@ function clearTuzhongSelection() {
 }
 
 // 显示图种信息
-function displayTuzhongInfo(info) {
+function updateTuzhongInfo(info) {
     if (!info.isValid) {
         tuzhongInfo.classList.add("hidden");
         return;
@@ -941,27 +1087,62 @@ function showExtractResult(message, type) {
 
 // 进度更新节流变量
 let lastProgressUpdate = 0;
-let progressUpdateDelay = 100; // 100ms 节流
+let progressUpdateDelay = 80; // 节流间隔，保证动画流畅
 
 // 监听后端进度事件
 EventsOn("progress", function(data) {
     // 节流进度更新，减少UI跳动
     const now = Date.now();
     if (data.step === "complete" || now - lastProgressUpdate >= progressUpdateDelay) {
-        updateProgress(data.percent, data.message);
+        // 传递额外信息给updateProgress函数
+        const additionalInfo = {
+            totalSize: data.totalSize || null,
+            currentSize: data.currentSize || null,
+            speed: data.speed || null
+        };
+        
+        updateProgress(data.percent, data.message, data.step, additionalInfo);
         lastProgressUpdate = now;
     }
     
     if (data.step === "complete") {
         setTimeout(() => {
             hideProgressModal();
-            showSuccessModal(currentSavePath);
+            const displayPath = currentSavePath || "（未知路径）";
+            const summaryMessage = currentProgressMode === "create"
+                ? `图种生成完成！文件已保存到: ${displayPath}`
+                : `提取完成！文件已保存到: ${displayPath}`;
+            if (currentProgressMode === "create") {
+                showResult(summaryMessage, "success");
+            } else {
+                showExtractResult(summaryMessage, "success");
+            }
+            showSuccessModal(currentSavePath, currentProgressMode);
         }, 500); // 显示100%一会儿后隐藏
     }
 });
 
 // 进度条相关函数 - 防止布局跳动
-function showProgressModal() {
+function showProgressModal(mode = "create") {
+    currentProgressMode = progressSequences[mode] ? mode : "create";
+    
+    // 重置进度信息
+    resetProgressInfo();
+    
+    if (progressHeaderTitle) {
+        progressHeaderTitle.textContent = currentProgressMode === "create" ? "生成图种" : "提取文件";
+    }
+    Object.entries(progressStepContainers).forEach(([key, container]) => {
+        if (!container) {
+            return;
+        }
+        if (key === currentProgressMode) {
+            container.classList.remove("hidden");
+        } else {
+            container.classList.add("hidden");
+        }
+    });
+    resetProgressSteps();
     // 使用 requestAnimationFrame 确保平滑显示
     requestAnimationFrame(() => {
         progressModal.style.display = 'flex'; // 先设置display
@@ -970,7 +1151,7 @@ function showProgressModal() {
             progressModal.classList.remove("hidden");
         });
     });
-    updateProgress(0, "准备开始...");
+    updateProgress(0, PROGRESS_MESSAGES.start, "start");
     lastProgressUpdate = 0; // 重置节流计时器
 }
 
@@ -985,20 +1166,527 @@ function hideProgressModal() {
     }, 300); // 等待CSS过渡完成
 }
 
-function updateProgress(percent, message) {
+// 进度追踪变量
+let progressStartTime = 0;
+let processedBytes = 0;
+let totalBytes = 0;
+let lastUpdateTime = 0;
+let lastProcessedBytes = 0;
+
+function updateProgress(percent, message, step, additionalInfo = {}) {
     // 使用 requestAnimationFrame 优化动画性能
     requestAnimationFrame(() => {
-        progressText.textContent = message;
-        progressBar.style.width = percent + "%";
+        const currentTime = Date.now();
+        
+        // 更新基本进度信息
+        if (progressStage) {
+            const stageText = PROGRESS_MESSAGES[step] || message || PROGRESS_MESSAGES.start;
+            progressStage.textContent = stageText;
+        }
+        
+        if (progressDetail) {
+            const stageText = PROGRESS_MESSAGES[step];
+            if (message && message !== stageText) {
+                progressDetail.textContent = message;
+            } else {
+                progressDetail.textContent = "";
+            }
+        }
+        
+        // 平滑进度条动画
+        const currentWidth = parseFloat(progressBar.style.width) || 0;
+        if (Math.abs(percent - currentWidth) > 0.1) {
+            progressBar.style.width = percent + "%";
+        }
         progressPercentage.textContent = Math.round(percent) + "%";
+        
+        // 更新详细信息
+        updateProgressInfo(percent, additionalInfo, currentTime);
+        
+        highlightProgressStep(step);
+    });
+}
+
+function updateProgressInfo(percent, additionalInfo, currentTime) {
+    const fileSizeEl = document.getElementById('fileSize');
+    const processSpeedEl = document.getElementById('processSpeed');
+    const remainingTimeEl = document.getElementById('remainingTime');
+    
+    if (!fileSizeEl || !processSpeedEl || !remainingTimeEl) return;
+    
+    // 更新文件大小信息
+    if (additionalInfo.totalSize) {
+        totalBytes = additionalInfo.totalSize;
+        fileSizeEl.textContent = formatFileSize(totalBytes);
+    } else if (additionalInfo.currentSize) {
+        fileSizeEl.textContent = formatFileSize(additionalInfo.currentSize);
+    }
+    
+    // 计算处理速度和剩余时间
+    if (progressStartTime === 0) {
+        progressStartTime = currentTime;
+        lastUpdateTime = currentTime;
+        lastProcessedBytes = 0;
+    }
+    
+    const elapsedTime = (currentTime - progressStartTime) / 1000; // 秒
+    const timeSinceLastUpdate = (currentTime - lastUpdateTime) / 1000;
+    
+    if (totalBytes > 0 && elapsedTime > 0.5) {
+        processedBytes = Math.floor((percent / 100) * totalBytes);
+        
+        // 计算处理速度（使用滑动窗口平均）
+        if (timeSinceLastUpdate >= 1) { // 每秒更新一次速度
+            const bytesDelta = processedBytes - lastProcessedBytes;
+            const speed = bytesDelta / timeSinceLastUpdate;
+            
+            if (speed > 0) {
+                processSpeedEl.textContent = formatFileSize(speed) + '/s';
+                
+                // 计算剩余时间
+                const remainingBytes = totalBytes - processedBytes;
+                const remainingSeconds = remainingBytes / speed;
+                
+                if (remainingSeconds > 0 && remainingSeconds < 3600) { // 小于1小时才显示
+                    remainingTimeEl.textContent = formatTime(remainingSeconds);
+                } else {
+                    remainingTimeEl.textContent = '--';
+                }
+            }
+            
+            lastUpdateTime = currentTime;
+            lastProcessedBytes = processedBytes;
+        }
+    } else {
+        if (percent >= 99) {
+            processSpeedEl.textContent = '完成';
+            remainingTimeEl.textContent = '00:00';
+        }
+    }
+}
+
+function formatTime(seconds) {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+}
+
+function resetProgressInfo() {
+    progressStartTime = 0;
+    processedBytes = 0;
+    totalBytes = 0;
+    lastUpdateTime = 0;
+    lastProcessedBytes = 0;
+    
+    const fileSizeEl = document.getElementById('fileSize');
+    const processSpeedEl = document.getElementById('processSpeed');
+    const remainingTimeEl = document.getElementById('remainingTime');
+    
+    if (fileSizeEl) fileSizeEl.textContent = '计算中...';
+    if (processSpeedEl) processSpeedEl.textContent = '--';
+    if (remainingTimeEl) remainingTimeEl.textContent = '计算中...';
+}
+
+function resetProgressSteps() {
+    document.querySelectorAll('.progress-step').forEach(stepEl => {
+        stepEl.classList.remove('active', 'completed');
+    });
+    const activeContainer = progressStepContainers[currentProgressMode];
+    const sequence = progressSequences[currentProgressMode] || [];
+    if (activeContainer && sequence.length > 0) {
+        const firstStep = activeContainer.querySelector(`.progress-step[data-step="${sequence[0]}"]`);
+        if (firstStep) {
+            firstStep.classList.add('active');
+        }
+    }
+    if (progressDetail) {
+        progressDetail.textContent = "";
+    }
+}
+
+function highlightProgressStep(step) {
+    const activeContainer = progressStepContainers[currentProgressMode];
+    if (!activeContainer) {
+        return;
+    }
+    const sequence = progressSequences[currentProgressMode] || [];
+    if (!step || sequence.indexOf(step) === -1) {
+        return;
+    }
+    const stepIndex = sequence.indexOf(step);
+    sequence.forEach((name, index) => {
+        const element = activeContainer.querySelector(`.progress-step[data-step="${name}"]`);
+        if (!element) {
+            return;
+        }
+        if (index < stepIndex) {
+            element.classList.add('completed');
+            element.classList.remove('active');
+        } else if (index === stepIndex) {
+            element.classList.add('active');
+            element.classList.remove('completed');
+        } else {
+            element.classList.remove('active', 'completed');
+        }
+    });
+}
+
+function initTheme() {
+    // 检测系统主题偏好
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const storedTheme = localStorage.getItem(THEME_STORAGE_KEY);
+    
+    // 确定初始主题
+    let initialTheme;
+    if (storedTheme) {
+        initialTheme = storedTheme;
+    } else {
+        initialTheme = mediaQuery.matches ? 'theme-dark' : 'theme-light';
+    }
+    
+    // 应用初始主题
+    applyTheme(initialTheme, { persist: false });
+    
+    // 监听系统主题变化
+    mediaQuery.addListener((e) => {
+        // 只有在没有用户自定义偏好时才跟随系统主题
+        if (!localStorage.getItem(THEME_STORAGE_KEY)) {
+            const systemTheme = e.matches ? 'theme-dark' : 'theme-light';
+            applyTheme(systemTheme, { persist: false });
+        }
+    });
+    
+    // 设置主题切换按钮事件
+    if (themeToggleBtn) {
+        themeToggleBtn.addEventListener('click', () => {
+            // 添加点击动画
+            themeToggleBtn.style.transform = 'scale(0.95)';
+            setTimeout(() => {
+                themeToggleBtn.style.transform = '';
+            }, 150);
+            
+            const nextTheme = currentTheme === 'theme-dark' ? 'theme-light' : 'theme-dark';
+            applyTheme(nextTheme);
+        });
+        
+        // 添加键盘支持
+        themeToggleBtn.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                themeToggleBtn.click();
+            }
+        });
+    }
+}
+
+function applyTheme(theme, options = {}) {
+    const finalTheme = theme === 'theme-light' ? 'theme-light' : 'theme-dark';
+    
+    // 如果主题没有变化，直接返回
+    if (currentTheme === finalTheme) {
+        return;
+    }
+    
+    // 添加过渡动画类
+    document.body.classList.add('theme-transitioning');
+    
+    currentTheme = finalTheme;
+    document.body.classList.remove('theme-dark', 'theme-light');
+    document.body.classList.add(finalTheme);
+    
+    updateThemeToggleUI(finalTheme);
+    
+    // 保存主题偏好
+    if (options.persist !== false) {
+        localStorage.setItem(THEME_STORAGE_KEY, finalTheme);
+    }
+    
+    // 同步Wails窗口主题
+    try {
+        if (finalTheme === 'theme-dark' && typeof WindowSetDarkTheme === 'function') {
+            WindowSetDarkTheme();
+        } else if (finalTheme === 'theme-light' && typeof WindowSetLightTheme === 'function') {
+            WindowSetLightTheme();
+        }
+    } catch (err) {
+        console.warn('同步系统主题失败:', err);
+    }
+    
+    // 移除过渡动画类
+    setTimeout(() => {
+        document.body.classList.remove('theme-transitioning');
+    }, 300);
+    
+    // 触发主题切换事件
+    window.dispatchEvent(new CustomEvent('themeChanged', {
+        detail: { theme: finalTheme }
+    }));
+}
+
+function updateThemeToggleUI(theme) {
+    if (!themeToggleBtn) {
+        return;
+    }
+    
+    // 更新属性
+    themeToggleBtn.setAttribute('data-theme', theme);
+    themeToggleBtn.setAttribute('aria-pressed', theme === 'theme-light' ? 'true' : 'false');
+    
+    // 更新文本
+    const textEl = themeToggleBtn.querySelector('.theme-toggle-text');
+    if (textEl) {
+        const newText = theme === 'theme-dark' ? '浅色模式' : '深色模式';
+        
+        // 平滑文本过渡
+        textEl.style.opacity = '0';
+        setTimeout(() => {
+            textEl.textContent = newText;
+            textEl.style.opacity = '1';
+        }, 150);
+    }
+    
+    // 添加图标旋转动画
+    const icons = themeToggleBtn.querySelectorAll('.theme-icon');
+    icons.forEach(icon => {
+        icon.style.transform = 'rotate(180deg)';
+        setTimeout(() => {
+            icon.style.transform = '';
+        }, 300);
+    });
+}
+
+function setupFileDropHandling() {
+    const dropTargets = document.querySelectorAll('[data-drop-target]');
+    dropTargets.forEach(target => {
+        target.style.setProperty('--wails-drop-target', 'drop');
+        // 添加原生拖放事件监听用于视觉反馈
+        setupDropZoneVisualFeedback(target);
+    });
+    
+    if (typeof OnFileDrop !== 'function') {
+        console.warn('当前环境未启用文件拖放功能');
+        return;
+    }
+    
+    try {
+        OnFileDrop((x, y, paths) => {
+            // 清除所有拖放状态
+            clearDropTargetStates();
+            
+            if (!paths || paths.length === 0) {
+                showDropMessage('没有检测到有效文件', 'error');
+                return;
+            }
+            
+            const element = document.elementFromPoint(x, y);
+            if (!element) {
+                return;
+            }
+            
+            const dropTarget = element.closest('[data-drop-target]');
+            if (!dropTarget) {
+                showDropMessage('请将文件拖放到正确的区域', 'warning');
+                return;
+            }
+            
+            const dropType = dropTarget.getAttribute('data-drop-target');
+            
+            // 处理多文件拖放
+            if (paths.length > 1 && dropType !== 'target') {
+                showDropMessage(`检测到${paths.length}个文件，将处理第一个文件`, 'info');
+            }
+            
+            const primaryPath = paths[0];
+            
+            // 验证文件类型并处理
+            if (dropType === 'image') {
+                if (validateImageFile(primaryPath)) {
+                    handleImageSelection(primaryPath);
+                    showDropMessage('图片文件添加成功', 'success');
+                } else {
+                    showDropMessage('请拖放有效的图片文件 (jpg, jpeg, png, gif, bmp, webp)', 'error');
+                }
+            } else if (dropType === 'target') {
+                // 对于目标文件，支持多种类型
+                setTargetSelection(primaryPath);
+                const fileName = primaryPath.split('\\').pop() || primaryPath.split('/').pop();
+                showDropMessage(`文件 "${fileName}" 添加成功`, 'success');
+            } else if (dropType === 'tuzhong') {
+                if (validateTuzhongFile(primaryPath)) {
+                    handleTuzhongSelection(primaryPath);
+                    showDropMessage('图种文件添加成功', 'success');
+                } else {
+                    showDropMessage('请拖放有效的图种文件', 'error');
+                }
+            }
+        }, true);
+    } catch (error) {
+        console.error('初始化拖放事件失败:', error);
+        showDropMessage('文件拖放功能初始化失败', 'error');
+    }
+}
+
+// 设置拖放区域的视觉反馈
+function setupDropZoneVisualFeedback(target) {
+    let dragCounter = 0;
+    
+    // 拖拽进入
+    target.addEventListener('dragenter', (e) => {
+        e.preventDefault();
+        dragCounter++;
+        target.classList.add('drag-over');
+        
+        const dropType = target.getAttribute('data-drop-target');
+        showDropHint(dropType);
+    });
+    
+    // 拖拽离开
+    target.addEventListener('dragleave', (e) => {
+        e.preventDefault();
+        dragCounter--;
+        if (dragCounter === 0) {
+            target.classList.remove('drag-over');
+            hideDropHint();
+        }
+    });
+    
+    // 拖拽经过
+    target.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'copy';
+    });
+    
+    // 文件放下
+    target.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dragCounter = 0;
+        target.classList.remove('drag-over');
+        hideDropHint();
+    });
+}
+
+// 验证图片文件
+function validateImageFile(filePath) {
+    const imageExtensions = /\.(jpg|jpeg|png|gif|bmp|webp)$/i;
+    return imageExtensions.test(filePath);
+}
+
+// 验证图种文件
+function validateTuzhongFile(filePath) {
+    const imageExtensions = /\.(jpg|jpeg|png|gif|bmp|webp)$/i;
+    return imageExtensions.test(filePath);
+}
+
+// 显示拖放提示
+function showDropHint(dropType) {
+    const hints = {
+        'image': '拖放图片文件作为封面',
+        'target': '拖放要隐藏的文件或文件夹',
+        'tuzhong': '拖放图种文件进行解析'
+    };
+    
+    const hint = hints[dropType] || '拖放文件到此区域';
+    showDropMessage(hint, 'info', true);
+}
+
+// 隐藏拖放提示
+function hideDropHint() {
+    const messageEl = document.querySelector('.drop-message.persistent');
+    if (messageEl) {
+        messageEl.remove();
+    }
+}
+
+// 显示拖放消息
+function showDropMessage(message, type = 'info', persistent = false) {
+    // 移除现有消息
+    const existingMessage = document.querySelector('.drop-message');
+    if (existingMessage) {
+        existingMessage.remove();
+    }
+    
+    const messageEl = document.createElement('div');
+    messageEl.className = `drop-message drop-message-${type} ${persistent ? 'persistent' : ''}`;
+    messageEl.textContent = message;
+    
+    // 添加样式
+    Object.assign(messageEl.style, {
+        position: 'fixed',
+        top: '20px',
+        right: '20px',
+        padding: '12px 20px',
+        borderRadius: '8px',
+        color: 'white',
+        fontWeight: '500',
+        fontSize: '14px',
+        zIndex: '10000',
+        maxWidth: '300px',
+        wordWrap: 'break-word',
+        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+        transform: 'translateX(100%)',
+        transition: 'transform 0.3s ease',
+        backdropFilter: 'blur(10px)'
+    });
+    
+    // 设置背景色
+    const colors = {
+        success: 'rgba(34, 197, 94, 0.9)',
+        error: 'rgba(239, 68, 68, 0.9)',
+        warning: 'rgba(245, 158, 11, 0.9)',
+        info: 'rgba(59, 130, 246, 0.9)'
+    };
+    messageEl.style.background = colors[type] || colors.info;
+    
+    document.body.appendChild(messageEl);
+    
+    // 动画显示
+    requestAnimationFrame(() => {
+        messageEl.style.transform = 'translateX(0)';
+    });
+    
+    // 自动隐藏（除非是持续显示）
+    if (!persistent) {
+        setTimeout(() => {
+            if (messageEl.parentNode) {
+                messageEl.style.transform = 'translateX(100%)';
+                setTimeout(() => {
+                    if (messageEl.parentNode) {
+                        messageEl.remove();
+                    }
+                }, 300);
+            }
+        }, 3000);
+    }
+}
+
+// 清除所有拖放目标状态
+function clearDropTargetStates() {
+    const dropTargets = document.querySelectorAll('[data-drop-target]');
+    dropTargets.forEach(target => {
+        target.classList.remove('drag-over', 'wails-drop-target-active');
     });
 }
 
 // 成功模态框相关函数 - 防止布局跳动
-function showSuccessModal(filePath) {
-    const fileName = filePath.split('\\').pop().split('/').pop();
-    successMessage.textContent = "图种文件已成功保存！";
-    successPath.textContent = filePath;
+function showSuccessModal(filePath, mode = "create") {
+    const normalizedPath = filePath || "";
+    const isCreateMode = mode === "create";
+    const hasPath = Boolean(normalizedPath);
+    const titleText = isCreateMode ? "生成成功" : "提取完成";
+    const messageText = isCreateMode ? "图种文件已成功保存！" : "隐藏文件已成功提取！";
+    successMessage.textContent = messageText;
+    if (successPath) {
+        successPath.textContent = hasPath ? normalizedPath : "路径不可用";
+        successPath.classList.toggle('hidden', !hasPath);
+    }
+    if (successTitle) {
+        successTitle.textContent = titleText;
+    }
+    if (openLocationBtn) {
+        openLocationBtn.textContent = isCreateMode ? "打开位置" : "打开提取文件夹";
+        openLocationBtn.disabled = !hasPath;
+        openLocationBtn.classList.toggle('disabled', !hasPath);
+    }
     
     // 使用 requestAnimationFrame 确保平滑显示
     requestAnimationFrame(() => {
@@ -1024,7 +1712,11 @@ function hideSuccessModal() {
 // 模态框事件处理
 cancelProgressBtn.addEventListener('click', function() {
     hideProgressModal();
-    showResult("用户取消了操作", "info");
+    if (currentProgressMode === "create") {
+        showResult("用户取消了操作", "info");
+    } else {
+        showExtractResult("用户取消了操作", "info");
+    }
 });
 
 closeSuccessBtn.addEventListener('click', function() {
@@ -1037,6 +1729,11 @@ openLocationBtn.addEventListener('click', function() {
             .catch((err) => {
                 console.error("打开文件位置失败:", err);
             });
+    } else {
+        return;
     }
     hideSuccessModal();
 });
+
+initTheme();
+setupFileDropHandling();

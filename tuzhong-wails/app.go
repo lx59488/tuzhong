@@ -116,6 +116,9 @@ func main() {
 			UniqueId:               "com.tuzhong.generator",
 			OnSecondInstanceLaunch: nil,
 		},
+		DragAndDrop: &options.DragAndDrop{
+			EnableFileDrop: true,
+		},
 		OnStartup: app.startup,
 		Bind: []interface{}{
 			app,
