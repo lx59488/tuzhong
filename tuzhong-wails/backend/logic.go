@@ -2,6 +2,7 @@ package backend
 
 import (
 	"archive/zip"
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/base64"
@@ -10,12 +11,27 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
+// 性能优化常量
+const (
+	ChunkSize        = 1024 * 1024            // 1MB chunks for large file processing
+	MaxWorkers       = 4                      // 最大并发工作数
+	BufferPoolSize   = 10                     // 缓冲池大小
+	ProgressInterval = 100 * time.Millisecond // 进度更新间隔
+)
+
 type Generator struct {
-	ctx context.Context
+	ctx          context.Context
+	bufferPool   sync.Pool
+	workers      chan struct{} // 用于限制并发数量
+	errorHandler *ErrorMiddleware
+	validator    *ValidationHelper
+	configMgr    *ConfigManager // 配置管理器
 }
 
 // 图种信息结构体
@@ -30,12 +46,165 @@ type TuzhongInfo struct {
 }
 
 func NewGenerator() *Generator {
-	return &Generator{}
+	g := &Generator{
+		workers:   make(chan struct{}, MaxWorkers),
+		validator: &ValidationHelper{},
+		configMgr: GlobalConfigManager,
+	}
+
+	// 初始化缓冲池
+	g.bufferPool.New = func() interface{} {
+		return make([]byte, ChunkSize)
+	}
+
+	return g
 }
 
 // 设置上下文
 func (g *Generator) SetContext(ctx context.Context) {
 	g.ctx = ctx
+	// 初始化错误处理中间件
+	g.errorHandler = NewErrorMiddleware(ctx)
+}
+
+// 优化的缓冲池管理
+func (g *Generator) getBuffer() []byte {
+	if buf := g.bufferPool.Get(); buf != nil {
+		return buf.([]byte)
+	}
+	return make([]byte, ChunkSize)
+}
+
+func (g *Generator) putBuffer(buf []byte) {
+	if cap(buf) == ChunkSize {
+		g.bufferPool.Put(buf[:0]) // 重置长度但保留容量
+	}
+}
+
+// 优化的文件读取 - 支持大文件分块处理
+func (g *Generator) readFileOptimized(filePath string) ([]byte, error) {
+	// 验证文件路径
+	if err := g.validator.ValidateFilePath(filePath); err != nil {
+		return nil, g.errorHandler.HandleError(err)
+	}
+
+	file, err := os.Open(filePath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, g.errorHandler.HandleError(NewFileNotFoundError(filePath))
+		}
+		if os.IsPermission(err) {
+			return nil, g.errorHandler.HandleError(NewFilePermissionError(filePath))
+		}
+		return nil, g.errorHandler.HandleError(NewIOError(ErrCodeOperationFailed, "打开文件失败", err))
+	}
+	defer file.Close()
+
+	// 获取文件信息
+	fileInfo, err := file.Stat()
+	if err != nil {
+		return nil, g.errorHandler.HandleError(NewIOError(ErrCodeOperationFailed, "获取文件信息失败", err))
+	}
+
+	fileSize := fileInfo.Size()
+
+	// 根据配置验证文件大小
+	config := GetGlobalConfig()
+	if config.FileSizeLimits.EnableSizeCheck && config.FileSizeLimits.MaxGeneralFile > 0 {
+		if err := g.validator.ValidateFileSize(fileSize, config.FileSizeLimits.MaxGeneralFile); err != nil {
+			return nil, g.errorHandler.HandleError(err)
+		}
+	}
+
+	// 对于小文件，直接读取
+	if fileSize <= ChunkSize {
+		data, err := os.ReadFile(filePath)
+		if err != nil {
+			return nil, g.errorHandler.HandleError(NewIOError(ErrCodeOperationFailed, "读取文件失败", err))
+		}
+		return data, nil
+	}
+
+	// 大文件分块读取
+	return g.readLargeFile(file, fileSize)
+} // 大文件分块读取
+func (g *Generator) readLargeFile(file *os.File, totalSize int64) ([]byte, error) {
+	result := make([]byte, 0, totalSize)
+	buffer := g.getBuffer()
+	defer g.putBuffer(buffer)
+
+	reader := bufio.NewReaderSize(file, ChunkSize)
+	var bytesRead int64
+	lastProgress := time.Now()
+
+	for {
+		n, err := reader.Read(buffer)
+		if n > 0 {
+			result = append(result, buffer[:n]...)
+			bytesRead += int64(n)
+
+			// 定期更新进度，避免过于频繁的UI更新
+			if time.Since(lastProgress) >= ProgressInterval {
+				progress := float64(bytesRead) / float64(totalSize) * 100
+				runtime.EventsEmit(g.ctx, "fileReadProgress", map[string]interface{}{
+					"percent": progress,
+					"message": fmt.Sprintf("读取文件中... (%.1f%%)", progress),
+				})
+				lastProgress = time.Now()
+			}
+		}
+
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("读取文件块失败: %v", err)
+		}
+	}
+
+	return result, nil
+}
+
+// 优化的图种文件读取 - 不进行大小限制检查
+func (g *Generator) readTuzhongFileOptimized(filePath string) ([]byte, error) {
+	// 验证文件路径
+	if err := g.validator.ValidateFilePath(filePath); err != nil {
+		return nil, g.errorHandler.HandleError(err)
+	}
+
+	file, err := os.Open(filePath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, g.errorHandler.HandleError(NewFileNotFoundError(filePath))
+		}
+		if os.IsPermission(err) {
+			return nil, g.errorHandler.HandleError(NewFilePermissionError(filePath))
+		}
+		return nil, g.errorHandler.HandleError(NewIOError(ErrCodeOperationFailed, "打开图种文件失败", err))
+	}
+	defer file.Close()
+
+	// 获取文件信息
+	fileInfo, err := file.Stat()
+	if err != nil {
+		return nil, g.errorHandler.HandleError(NewIOError(ErrCodeOperationFailed, "获取图种文件信息失败", err))
+	}
+
+	fileSize := fileInfo.Size()
+
+	// 图种文件不进行大小限制检查，因为它们本身就包含了压缩数据
+
+	// 对于小文件，直接读取
+	if fileSize <= ChunkSize {
+		data, err := os.ReadFile(filePath)
+		if err != nil {
+			return nil, g.errorHandler.HandleError(NewIOError(ErrCodeOperationFailed, "读取图种文件失败", err))
+		}
+		return data, nil
+	}
+
+	// 大文件分块读取
+	return g.readLargeFile(file, fileSize)
 }
 
 // 选择图片文件
@@ -54,29 +223,33 @@ func (g *Generator) SelectImageFile() (string, error) {
 
 // 获取图片的 base64 编码，用于预览
 func (g *Generator) GetImageBase64(imagePath string) (string, error) {
-	if imagePath == "" {
-		return "", fmt.Errorf("图片路径为空")
+	// 验证输入
+	if err := g.validator.ValidateFilePath(imagePath); err != nil {
+		return "", g.errorHandler.HandleError(err)
 	}
 
 	// 检查文件是否存在
 	if _, err := os.Stat(imagePath); os.IsNotExist(err) {
-		return "", fmt.Errorf("图片文件不存在: %s", imagePath)
+		return "", g.errorHandler.HandleError(NewFileNotFoundError(imagePath))
 	}
 
-	// 读取图片文件
-	imageData, err := os.ReadFile(imagePath)
+	// 使用优化的文件读取
+	imageData, err := g.readFileOptimized(imagePath)
 	if err != nil {
-		return "", fmt.Errorf("读取图片文件失败: %v", err)
+		return "", err // 错误已在readFileOptimized中处理
 	}
 
-	// 检查文件大小（限制为 20MB，增加限制）
-	if len(imageData) > 20*1024*1024 {
-		return "", fmt.Errorf("图片文件太大（%.2f MB），请选择小于 20MB 的图片", float64(len(imageData))/(1024*1024))
+	// 根据配置检查图片文件大小
+	config := GetGlobalConfig()
+	if config.FileSizeLimits.EnableSizeCheck && config.FileSizeLimits.MaxImageSize > 0 {
+		if int64(len(imageData)) > config.FileSizeLimits.MaxImageSize {
+			return "", g.errorHandler.HandleError(NewFileTooLargeError(imagePath, int64(len(imageData)), config.FileSizeLimits.MaxImageSize))
+		}
 	}
 
 	// 检查文件是否为空
 	if len(imageData) == 0 {
-		return "", fmt.Errorf("图片文件为空")
+		return "", g.errorHandler.HandleError(NewImageError(ErrCodeImageInvalid, "图片文件为空"))
 	}
 
 	// 根据文件扩展名确定 MIME 类型
@@ -97,18 +270,22 @@ func (g *Generator) GetImageBase64(imagePath string) (string, error) {
 		// 如果扩展名不匹配，尝试检测文件头
 		mimeType = g.detectImageMimeType(imageData)
 		if mimeType == "" {
-			return "", fmt.Errorf("不支持的图片格式: %s", ext)
+			return "", g.errorHandler.HandleError(NewInvalidFormatError(ext, "JPEG, PNG, GIF, BMP, WEBP"))
 		}
+	}
+
+	// 验证图像格式
+	format := strings.ToUpper(strings.TrimPrefix(ext, "."))
+	if err := g.validator.ValidateImageFormat(format); err != nil {
+		return "", g.errorHandler.HandleError(err)
 	}
 
 	// 转换为 base64
 	base64String := base64.StdEncoding.EncodeToString(imageData)
-
-	// 返回完整的 data URL
 	return fmt.Sprintf("data:%s;base64,%s", mimeType, base64String), nil
 }
 
-// 通过文件头检测图片格式
+// 检测图片的 MIME 类型
 func (g *Generator) detectImageMimeType(data []byte) string {
 	if len(data) < 4 {
 		return ""
@@ -120,13 +297,12 @@ func (g *Generator) detectImageMimeType(data []byte) string {
 	}
 
 	// PNG
-	if len(data) >= 8 && data[0] == 0x89 && data[1] == 0x50 && data[2] == 0x4E && data[3] == 0x47 &&
-		data[4] == 0x0D && data[5] == 0x0A && data[6] == 0x1A && data[7] == 0x0A {
+	if len(data) >= 8 && data[0] == 0x89 && data[1] == 0x50 && data[2] == 0x4E && data[3] == 0x47 {
 		return "image/png"
 	}
 
 	// GIF
-	if len(data) >= 6 && string(data[0:6]) == "GIF87a" || string(data[0:6]) == "GIF89a" {
+	if len(data) >= 6 && (string(data[0:6]) == "GIF87a" || string(data[0:6]) == "GIF89a") {
 		return "image/gif"
 	}
 
@@ -143,16 +319,149 @@ func (g *Generator) detectImageMimeType(data []byte) string {
 	return ""
 }
 
-// 选择任意文件
+// GetTuzhongImageBase64 获取图种文件的图片预览（优化版本）
+func (g *Generator) GetTuzhongImageBase64(imagePath string) (string, error) {
+	if imagePath == "" {
+		return "", g.errorHandler.HandleError(NewValidationError(ErrCodeInvalidInput, "图种文件路径为空"))
+	}
+
+	// 检查文件是否存在
+	if _, err := os.Stat(imagePath); os.IsNotExist(err) {
+		return "", g.errorHandler.HandleError(NewFileNotFoundError(imagePath))
+	}
+
+	// 只读取图片部分，不读取整个图种文件
+	imageData, err := g.extractImageOnlyFromTuzhong(imagePath)
+	if err != nil {
+		return "", err
+	}
+
+	// 检查文件是否为空
+	if len(imageData) == 0 {
+		return "", g.errorHandler.HandleError(NewImageError(ErrCodeImageInvalid, "图种文件中的图片为空"))
+	}
+
+	// 根据文件扩展名确定 MIME 类型
+	ext := strings.ToLower(filepath.Ext(imagePath))
+	var mimeType string
+	switch ext {
+	case ".jpg", ".jpeg":
+		mimeType = "image/jpeg"
+	case ".png":
+		mimeType = "image/png"
+	case ".gif":
+		mimeType = "image/gif"
+	case ".bmp":
+		mimeType = "image/bmp"
+	case ".webp":
+		mimeType = "image/webp"
+	default:
+		// 如果扩展名不匹配，尝试检测文件头
+		mimeType = g.detectImageMimeType(imageData)
+		if mimeType == "" {
+			return "", g.errorHandler.HandleError(NewImageError(ErrCodeImageInvalid, fmt.Sprintf("不支持的图片格式: %s", ext)))
+		}
+	}
+
+	// 转换为 base64
+	base64String := base64.StdEncoding.EncodeToString(imageData)
+	return fmt.Sprintf("data:%s;base64,%s", mimeType, base64String), nil
+}
+
+// 从图种文件中只提取图片部分（优化性能）
+func (g *Generator) extractImageOnlyFromTuzhong(tuzhongPath string) ([]byte, error) {
+	// 验证文件路径
+	if err := g.validator.ValidateFilePath(tuzhongPath); err != nil {
+		return nil, g.errorHandler.HandleError(err)
+	}
+
+	file, err := os.Open(tuzhongPath)
+	if err != nil {
+		return nil, g.errorHandler.HandleError(NewIOError(ErrCodeOperationFailed, "打开图种文件失败", err))
+	}
+	defer file.Close()
+
+	// 读取文件头部信息以确定图片格式和大小
+	headerBuffer := make([]byte, 64*1024) // 读取64KB头部信息
+	n, err := file.Read(headerBuffer)
+	if err != nil && err != io.EOF {
+		return nil, g.errorHandler.HandleError(NewIOError(ErrCodeOperationFailed, "读取图种文件头部失败", err))
+	}
+
+	headerData := headerBuffer[:n]
+
+	// 检测图片信息
+	imageSize, imageFormat, err := g.detectImageInfo(headerData)
+	if err != nil {
+		// 如果从头部无法检测，尝试读取更多数据
+		return g.readImagePortionFromTuzhong(file, tuzhongPath)
+	}
+
+	// 重新定位到文件开头
+	if _, err := file.Seek(0, 0); err != nil {
+		return nil, g.errorHandler.HandleError(NewIOError(ErrCodeOperationFailed, "重置文件指针失败", err))
+	}
+
+	// 只读取图片部分
+	imageData := make([]byte, imageSize)
+	_, err = io.ReadFull(file, imageData)
+	if err != nil {
+		return nil, g.errorHandler.HandleError(NewIOError(ErrCodeOperationFailed, "读取图种中的图片数据失败", err))
+	}
+
+	runtime.EventsEmit(g.ctx, "tuzhongPreviewProgress", map[string]interface{}{
+		"message": fmt.Sprintf("已提取图片数据 (%.2f MB，格式: %s)", float64(imageSize)/(1024*1024), imageFormat),
+	})
+
+	return imageData, nil
+}
+
+// 当无法从头部检测图片信息时，读取图片部分的备用方法
+func (g *Generator) readImagePortionFromTuzhong(file *os.File, tuzhongPath string) ([]byte, error) {
+	// 获取文件大小
+	fileInfo, err := file.Stat()
+	if err != nil {
+		return nil, g.errorHandler.HandleError(NewIOError(ErrCodeOperationFailed, "获取图种文件信息失败", err))
+	}
+
+	fileSize := fileInfo.Size()
+
+	// 对于大文件，限制读取大小以提高性能
+	maxReadSize := int64(50 * 1024 * 1024) // 最多读取50MB
+	if fileSize > maxReadSize {
+		fileSize = maxReadSize
+	}
+
+	// 重新定位到文件开头
+	if _, err := file.Seek(0, 0); err != nil {
+		return nil, g.errorHandler.HandleError(NewIOError(ErrCodeOperationFailed, "重置文件指针失败", err))
+	}
+
+	// 分块读取数据直到找到图片结束标记
+	data := make([]byte, fileSize)
+	_, err = io.ReadFull(file, data)
+	if err != nil && err != io.EOF {
+		return nil, g.errorHandler.HandleError(NewIOError(ErrCodeOperationFailed, "读取图种文件数据失败", err))
+	}
+
+	// 检测图片信息
+	imageSize, _, err := g.detectImageInfo(data)
+	if err != nil {
+		return nil, g.errorHandler.HandleError(NewImageError(ErrCodeImageInvalid, "无法检测图种文件中的图片格式"))
+	}
+
+	// 如果检测到的图片大小超过了读取的数据，返回所有读取的数据
+	if imageSize > int64(len(data)) {
+		imageSize = int64(len(data))
+	}
+
+	return data[:imageSize], nil
+}
+
+// 选择文件
 func (g *Generator) SelectFile() (string, error) {
 	file, err := runtime.OpenFileDialog(g.ctx, runtime.OpenDialogOptions{
-		Title: "选择要隐藏的文件",
-		Filters: []runtime.FileFilter{
-			{
-				DisplayName: "所有文件",
-				Pattern:     "*.*",
-			},
-		},
+		Title: "选择文件",
 	})
 	return file, err
 }
@@ -160,273 +469,222 @@ func (g *Generator) SelectFile() (string, error) {
 // 选择文件夹
 func (g *Generator) SelectFolder() (string, error) {
 	folder, err := runtime.OpenDirectoryDialog(g.ctx, runtime.OpenDialogOptions{
-		Title: "选择要隐藏的文件夹",
+		Title: "选择文件夹",
 	})
 	return folder, err
 }
 
 // 选择保存位置
-func (g *Generator) SelectSaveLocation(defaultName string) (string, error) {
+func (g *Generator) SelectSaveLocation() (string, error) {
 	file, err := runtime.SaveFileDialog(g.ctx, runtime.SaveDialogOptions{
-		Title:           "保存图种",
-		DefaultFilename: defaultName,
+		Title: "选择保存位置",
 		Filters: []runtime.FileFilter{
 			{
 				DisplayName: "图片文件",
-				Pattern:     "*.jpg;*.jpeg;*.png",
+				Pattern:     "*.jpg;*.jpeg;*.png;*.gif;*.bmp;*.webp",
 			},
 		},
 	})
 	return file, err
 }
 
-// 选择提取文件夹
-func (g *Generator) SelectExtractLocation(suggestedName string) (string, error) {
-	folder, err := runtime.OpenDirectoryDialog(g.ctx, runtime.OpenDialogOptions{
-		Title: "选择提取位置",
-	})
-	if err != nil || folder == "" {
-		return "", err
+// 打开文件位置
+func (g *Generator) OpenFileLocation(filePath string) error {
+	if filePath == "" {
+		return fmt.Errorf("文件路径为空")
 	}
-
-	// 在选择的文件夹中创建以建议名称命名的子文件夹
-	extractPath := filepath.Join(folder, suggestedName)
-	return extractPath, nil
+	runtime.BrowserOpenURL(g.ctx, "file://"+filepath.Dir(filePath))
+	return nil
 }
 
-// 图种生成逻辑，供前端调用
-func (g *Generator) MergeFiles(imagePath, targetPath, outputPath string) (string, error) {
+// 合并文件 - 优化版本
+func (g *Generator) MergeFiles(imagePath, targetPath, outputPath string) error {
+	// 获取工作槽位
+	g.workers <- struct{}{}
+	defer func() { <-g.workers }()
+
 	// 发送开始事件
 	runtime.EventsEmit(g.ctx, "progress", map[string]interface{}{
 		"step":    "start",
-		"message": "开始生成图种...",
+		"message": "开始处理...",
 		"percent": 0,
 	})
 
-	// 创建临时zip文件
-	tempDir := filepath.Dir(outputPath)
-	tempZip := filepath.Join(tempDir, "temp_"+filepath.Base(outputPath)+".zip")
+	// 验证输入文件
+	if imagePath == "" || targetPath == "" {
+		return fmt.Errorf("图片路径或目标路径为空")
+	}
 
-	// 发送压缩进度
+	if outputPath == "" {
+		return fmt.Errorf("输出路径为空")
+	}
+
+	// 检查文件是否存在
+	if _, err := os.Stat(imagePath); os.IsNotExist(err) {
+		return fmt.Errorf("图片文件不存在: %s", imagePath)
+	}
+
+	if _, err := os.Stat(targetPath); os.IsNotExist(err) {
+		return fmt.Errorf("目标文件不存在: %s", targetPath)
+	}
+
+	// 读取图片文件
 	runtime.EventsEmit(g.ctx, "progress", map[string]interface{}{
 		"step":    "compress",
-		"message": "正在压缩文件...",
+		"message": "读取图片文件...",
 		"percent": 10,
 	})
 
-	err := g.createZipWithProgress(targetPath, tempZip)
+	imageData, err := g.readFileOptimized(imagePath)
 	if err != nil {
-		return "", err
+		return fmt.Errorf("读取图片文件失败: %v", err)
 	}
-	defer os.Remove(tempZip) // 清理临时文件
 
-	// 发送合并进度
+	// 创建临时zip文件
 	runtime.EventsEmit(g.ctx, "progress", map[string]interface{}{
-		"step":    "merge",
-		"message": "正在生成图种...",
-		"percent": 60,
+		"step":    "compress",
+		"message": "压缩目标文件...",
+		"percent": 30,
 	})
 
-	outFile, err := os.Create(outputPath)
+	zipData, err := g.createZipOptimized(targetPath)
 	if err != nil {
-		return "", err
-	}
-	defer outFile.Close()
-
-	if err := g.appendFile(outFile, imagePath); err != nil {
-		return "", err
+		return fmt.Errorf("创建zip文件失败: %v", err)
 	}
 
-	// 发送最终合并进度
+	// 合并文件
 	runtime.EventsEmit(g.ctx, "progress", map[string]interface{}{
 		"step":    "merge",
-		"message": "正在生成图种...",
-		"percent": 80,
+		"message": "合并文件...",
+		"percent": 70,
 	})
 
-	if err := g.appendFile(outFile, tempZip); err != nil {
-		return "", err
+	err = g.writeOutputFileOptimized(outputPath, imageData, zipData)
+	if err != nil {
+		return fmt.Errorf("写入输出文件失败: %v", err)
 	}
 
-	// 发送完成事件
+	// 完成
 	runtime.EventsEmit(g.ctx, "progress", map[string]interface{}{
 		"step":    "complete",
-		"message": "图种生成完成！",
+		"message": "合并完成！",
 		"percent": 100,
 	})
 
-	return "图种生成成功！文件已保存到: " + outputPath, nil
+	return nil
 }
 
-func (g *Generator) appendFile(dst *os.File, srcPath string) error {
-	src, err := os.Open(srcPath)
-	if err != nil {
-		return err
-	}
-	defer src.Close()
+// 优化的zip创建
+func (g *Generator) createZipOptimized(sourcePath string) ([]byte, error) {
+	var buf bytes.Buffer
+	writer := zip.NewWriter(&buf)
+	defer writer.Close()
 
-	_, err = io.Copy(dst, src)
-	return err
-}
-
-// 创建zip压缩文件
-func (g *Generator) createZip(sourcePath, zipPath string) error {
-	zipFile, err := os.Create(zipPath)
-	if err != nil {
-		return err
-	}
-	defer zipFile.Close()
-
-	zipWriter := zip.NewWriter(zipFile)
-	defer zipWriter.Close()
-
-	// 检查是文件还是文件夹
 	info, err := os.Stat(sourcePath)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if info.IsDir() {
-		return g.addDirToZip(zipWriter, sourcePath, "")
+		err = g.addDirToZipOptimized(writer, sourcePath, "")
 	} else {
-		return g.addFileToZip(zipWriter, sourcePath, filepath.Base(sourcePath))
+		err = g.addFileToZipOptimized(writer, sourcePath, filepath.Base(sourcePath))
 	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	writer.Close()
+	return buf.Bytes(), nil
 }
 
-// 将文件夹添加到zip
-func (g *Generator) addDirToZip(zipWriter *zip.Writer, dirPath, baseInZip string) error {
-	return filepath.Walk(dirPath, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-
-		// 计算在zip中的路径
-		relPath, err := filepath.Rel(dirPath, path)
-		if err != nil {
-			return err
-		}
-
-		zipPath := filepath.Join(baseInZip, relPath)
-		// 将Windows路径分隔符转换为标准的斜杠
-		zipPath = strings.ReplaceAll(zipPath, "\\", "/")
-
-		if info.IsDir() {
-			// 为文件夹创建一个条目（以/结尾）
-			if zipPath != "" && zipPath != "." {
-				_, err := zipWriter.Create(zipPath + "/")
-				return err
-			}
-			return nil
-		}
-
-		return g.addFileToZip(zipWriter, path, zipPath)
-	})
-}
-
-// 将文件添加到zip
-func (g *Generator) addFileToZip(zipWriter *zip.Writer, filePath, nameInZip string) error {
+// 优化的文件添加到zip
+func (g *Generator) addFileToZipOptimized(writer *zip.Writer, filePath, zipPath string) error {
 	file, err := os.Open(filePath)
 	if err != nil {
 		return err
 	}
 	defer file.Close()
 
-	zipEntry, err := zipWriter.Create(nameInZip)
+	info, err := file.Stat()
 	if err != nil {
 		return err
 	}
 
-	_, err = io.Copy(zipEntry, file)
+	header, err := zip.FileInfoHeader(info)
+	if err != nil {
+		return err
+	}
+
+	header.Name = strings.ReplaceAll(zipPath, "\\", "/")
+	header.Method = zip.Deflate
+
+	zipFile, err := writer.CreateHeader(header)
+	if err != nil {
+		return err
+	}
+
+	// 使用缓冲区进行分块复制
+	buffer := g.getBuffer()
+	defer g.putBuffer(buffer)
+
+	_, err = io.CopyBuffer(zipFile, file, buffer)
 	return err
 }
 
-// 带进度的压缩方法
-func (g *Generator) createZipWithProgress(sourcePath, zipPath string) error {
-	zipFile, err := os.Create(zipPath)
-	if err != nil {
-		return err
-	}
-	defer zipFile.Close()
+// 优化的目录添加到zip
+func (g *Generator) addDirToZipOptimized(writer *zip.Writer, sourcePath, baseInZip string) error {
+	return filepath.Walk(sourcePath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
 
-	zipWriter := zip.NewWriter(zipFile)
-	defer zipWriter.Close()
-
-	// 检查是文件还是文件夹
-	info, err := os.Stat(sourcePath)
-	if err != nil {
-		return err
-	}
-
-	if info.IsDir() {
-		// 先统计总文件数
-		totalFiles := 0
-		filepath.Walk(sourcePath, func(path string, info os.FileInfo, err error) error {
-			if err == nil && !info.IsDir() {
-				totalFiles++
-			}
+		if info.IsDir() {
 			return nil
-		})
+		}
 
-		currentFile := 0
-		return filepath.Walk(sourcePath, func(path string, info os.FileInfo, err error) error {
-			if err != nil {
-				return err
-			}
+		relPath, err := filepath.Rel(sourcePath, path)
+		if err != nil {
+			return err
+		}
 
-			relPath, err := filepath.Rel(sourcePath, path)
-			if err != nil {
-				return err
-			}
-
-			zipPath := strings.ReplaceAll(relPath, "\\", "/")
-
-			if info.IsDir() {
-				if zipPath != "" && zipPath != "." {
-					_, err := zipWriter.Create(zipPath + "/")
-					return err
-				}
-				return nil
-			}
-
-			currentFile++
-			// 减少进度事件频率，避免UI跳动
-			if totalFiles > 0 && (currentFile%10 == 0 || currentFile == totalFiles || currentFile == 1) {
-				percent := 10 + int(float64(currentFile)/float64(totalFiles)*50) // 10%-60%
-				runtime.EventsEmit(g.ctx, "progress", map[string]interface{}{
-					"step":    "compress",
-					"message": fmt.Sprintf("正在压缩文件... (%d/%d)", currentFile, totalFiles),
-					"percent": percent,
-				})
-			}
-
-			return g.addFileToZip(zipWriter, path, zipPath)
-		})
-	} else {
-		// 单文件压缩
-		runtime.EventsEmit(g.ctx, "progress", map[string]interface{}{
-			"step":    "compress",
-			"message": "正在压缩文件...",
-			"percent": 30,
-		})
-		return g.addFileToZip(zipWriter, sourcePath, filepath.Base(sourcePath))
-	}
+		zipPath := filepath.Join(baseInZip, relPath)
+		return g.addFileToZipOptimized(writer, path, zipPath)
+	})
 }
 
-// 打开文件所在位置的方法
-func (g *Generator) OpenFileLocation(filePath string) error {
-	if filePath == "" {
-		return fmt.Errorf("路径为空")
+// 优化的输出文件写入
+func (g *Generator) writeOutputFileOptimized(outputPath string, imageData, zipData []byte) error {
+	// 确保目录存在
+	if err := os.MkdirAll(filepath.Dir(outputPath), 0755); err != nil {
+		return err
 	}
-	info, err := os.Stat(filePath)
-	if err == nil && info.IsDir() {
-		runtime.BrowserOpenURL(g.ctx, "file://"+filePath)
-		return nil
+
+	file, err := os.Create(outputPath)
+	if err != nil {
+		return err
 	}
-	runtime.BrowserOpenURL(g.ctx, "file://"+filepath.Dir(filePath))
-	return nil
+	defer file.Close()
+
+	// 使用缓冲写入
+	writer := bufio.NewWriterSize(file, ChunkSize)
+	defer writer.Flush()
+
+	// 写入图片数据
+	if _, err := writer.Write(imageData); err != nil {
+		return err
+	}
+
+	// 写入zip数据
+	if _, err := writer.Write(zipData); err != nil {
+		return err
+	}
+
+	return writer.Flush()
 }
 
-// 选择图种文件进行解析
+// 选择图种文件
 func (g *Generator) SelectTuzhongFile() (string, error) {
 	file, err := runtime.OpenFileDialog(g.ctx, runtime.OpenDialogOptions{
 		Title: "选择图种文件",
@@ -435,10 +693,6 @@ func (g *Generator) SelectTuzhongFile() (string, error) {
 				DisplayName: "图片文件",
 				Pattern:     "*.jpg;*.jpeg;*.png;*.gif;*.bmp;*.webp",
 			},
-			{
-				DisplayName: "所有文件",
-				Pattern:     "*.*",
-			},
 		},
 	})
 	return file, err
@@ -446,62 +700,64 @@ func (g *Generator) SelectTuzhongFile() (string, error) {
 
 // 分析图种文件
 func (g *Generator) AnalyzeTuzhong(tuzhongPath string) (*TuzhongInfo, error) {
+	fmt.Printf("[DEBUG] AnalyzeTuzhong 内部开始，路径: %s\n", tuzhongPath)
 	info := &TuzhongInfo{}
 
 	if tuzhongPath == "" {
+		fmt.Println("[DEBUG] 图种文件路径为空")
 		info.ErrorMessage = "请选择图种文件"
 		return info, fmt.Errorf("图种文件路径为空")
 	}
 
 	// 检查文件是否存在
+	fmt.Println("[DEBUG] 检查文件是否存在...")
 	fileInfo, err := os.Stat(tuzhongPath)
 	if os.IsNotExist(err) {
+		fmt.Printf("[DEBUG] 文件不存在: %s\n", tuzhongPath)
 		info.ErrorMessage = "图种文件不存在"
 		return info, fmt.Errorf("图种文件不存在: %s", tuzhongPath)
 	}
+	fmt.Printf("[DEBUG] 文件存在，大小: %d bytes\n", fileInfo.Size())
 
 	info.TotalSize = fileInfo.Size()
 
-	// 读取文件
-	data, err := os.ReadFile(tuzhongPath)
+	// 使用不限制大小的文件读取（图种文件可能很大）
+	fmt.Println("[DEBUG] 开始调用 readTuzhongFileOptimized...")
+	data, err := g.readTuzhongFileOptimized(tuzhongPath)
 	if err != nil {
+		fmt.Printf("[DEBUG] readTuzhongFileOptimized 失败: %v\n", err)
 		info.ErrorMessage = fmt.Sprintf("读取文件失败: %v", err)
 		return info, err
 	}
+	fmt.Printf("[DEBUG] readTuzhongFileOptimized 完成，数据大小: %d bytes\n", len(data))
 
 	// 检测图片格式和大小
+	fmt.Println("[DEBUG] 开始调用 detectImageInfo...")
 	imageSize, imageFormat, err := g.detectImageInfo(data)
 	if err != nil {
+		fmt.Printf("[DEBUG] detectImageInfo 失败: %v\n", err)
 		info.ErrorMessage = fmt.Sprintf("无法识别图片格式: %v", err)
 		return info, err
 	}
+	fmt.Printf("[DEBUG] detectImageInfo 完成，图片大小: %d, 格式: %s\n", imageSize, imageFormat)
 
 	info.ImageSize = imageSize
 	info.ImageFormat = imageFormat
 
-	// 调试信息：添加更详细的size信息
-	fmt.Printf("图片文件总大小: %d, 检测到的图片大小: %d, 图片格式: %s\n",
-		len(data), imageSize, imageFormat)
-
 	// 检查是否有隐藏数据
+	fmt.Printf("[DEBUG] 检查隐藏数据，总大小: %d, 图片大小: %d\n", len(data), imageSize)
 	if int64(len(data)) <= imageSize {
+		fmt.Println("[DEBUG] 没有隐藏数据，这是普通图片")
 		info.IsValid = false
 		info.ErrorMessage = "这是一个普通图片文件，没有隐藏数据"
-		// 虽然不是一个有效的图种，但对于前端来说这不是一个需要弹窗的“错误”，而是一个状态
-		// 所以我们返回 info 对象，让前端根据 IsValid 字段来判断如何显示
 		return info, nil
 	}
 
 	// 提取隐藏的zip数据
+	fmt.Println("[DEBUG] 开始提取隐藏数据...")
 	hiddenData := data[imageSize:]
+	fmt.Printf("[DEBUG] 隐藏数据大小: %d bytes\n", len(hiddenData))
 	info.HiddenSize = int64(len(hiddenData))
-
-	// 调试信息：显示隐藏数据的前几个字节
-	if len(hiddenData) >= 10 {
-		fmt.Printf("隐藏数据大小: %d, 前10字节: %x\n", len(hiddenData), hiddenData[:10])
-	} else if len(hiddenData) > 0 {
-		fmt.Printf("隐藏数据大小: %d, 所有字节: %x\n", len(hiddenData), hiddenData)
-	}
 
 	// 验证zip数据的基本结构
 	if len(hiddenData) < 4 {
@@ -510,34 +766,10 @@ func (g *Generator) AnalyzeTuzhong(tuzhongPath string) (*TuzhongInfo, error) {
 		return info, nil
 	}
 
-	// 检查zip文件头（更宽松的检测）
-	hasValidZipSignature := false
-	if len(hiddenData) >= 4 && hiddenData[0] == 0x50 && hiddenData[1] == 0x4B {
-		// PK签名存在，检查各种可能的zip结构
-		if (hiddenData[2] == 0x03 && hiddenData[3] == 0x04) || // Local file header
-			(hiddenData[2] == 0x01 && hiddenData[3] == 0x02) || // Central directory file header
-			(hiddenData[2] == 0x05 && hiddenData[3] == 0x06) || // End of central directory record
-			(hiddenData[2] == 0x07 && hiddenData[3] == 0x08) { // Data descriptor
-			hasValidZipSignature = true
-		}
-	}
-
-	// 如果没有找到PK签名，尝试查找zip文件的其他部分
-	if !hasValidZipSignature && len(hiddenData) >= 22 {
-		// 查找End of Central Directory Record
-		for i := len(hiddenData) - 22; i >= 0; i-- {
-			if len(hiddenData) >= i+4 &&
-				hiddenData[i] == 0x50 && hiddenData[i+1] == 0x4B &&
-				hiddenData[i+2] == 0x05 && hiddenData[i+3] == 0x06 {
-				hasValidZipSignature = true
-				break
-			}
-		}
-	}
-
-	if !hasValidZipSignature {
+	// 检查zip文件头
+	if !(hiddenData[0] == 0x50 && hiddenData[1] == 0x4B) {
 		info.IsValid = false
-		info.ErrorMessage = "隐藏数据不包含有效的zip文件签名"
+		info.ErrorMessage = "隐藏数据不是有效的zip文件格式"
 		return info, nil
 	}
 
@@ -546,7 +778,6 @@ func (g *Generator) AnalyzeTuzhong(tuzhongPath string) (*TuzhongInfo, error) {
 	if err != nil {
 		info.IsValid = false
 		info.ErrorMessage = fmt.Sprintf("解析隐藏数据失败: %v", err)
-		// 同样，返回 info 对象供前端判断
 		return info, nil
 	}
 
@@ -558,20 +789,41 @@ func (g *Generator) AnalyzeTuzhong(tuzhongPath string) (*TuzhongInfo, error) {
 
 // 从图种中提取文件
 func (g *Generator) ExtractFromTuzhong(tuzhongPath, outputDir string) error {
+	fmt.Printf("[DEBUG] ExtractFromTuzhong 开始执行，文件路径: %s，输出目录: %s\n", tuzhongPath, outputDir)
+
+	// 立即发送初始进度事件
+	runtime.EventsEmit(g.ctx, "progress", map[string]interface{}{
+		"step":    "start",
+		"message": "准备开始提取...",
+		"percent": 5,
+	})
+	fmt.Println("[DEBUG] 发送初始进度事件 5%")
+
+	// 获取工作槽位
+	fmt.Println("[DEBUG] 尝试获取工作槽位...")
+	g.workers <- struct{}{}
+	defer func() { <-g.workers }()
+	fmt.Println("[DEBUG] 工作槽位获取成功")
+
 	// 发送开始事件
 	runtime.EventsEmit(g.ctx, "progress", map[string]interface{}{
 		"step":    "start",
 		"message": "开始解析图种...",
-		"percent": 0,
+		"percent": 10,
 	})
+	fmt.Println("[DEBUG] 发送开始进度事件 10%")
 
 	// 分析图种
+	fmt.Println("[DEBUG] 开始调用 AnalyzeTuzhong...")
 	info, err := g.AnalyzeTuzhong(tuzhongPath)
 	if err != nil {
+		fmt.Printf("[ERROR] AnalyzeTuzhong 失败: %v\n", err)
 		return err
 	}
+	fmt.Printf("[DEBUG] AnalyzeTuzhong 完成，IsValid: %t\n", info.IsValid)
 
 	if !info.IsValid {
+		fmt.Printf("[ERROR] 图种无效: %s\n", info.ErrorMessage)
 		return fmt.Errorf(info.ErrorMessage)
 	}
 
@@ -581,15 +833,16 @@ func (g *Generator) ExtractFromTuzhong(tuzhongPath, outputDir string) error {
 		"message": "正在解析图种结构...",
 		"percent": 20,
 	})
+	fmt.Println("[DEBUG] 发送解析进度事件 20%")
 
-	// 读取文件
-	data, err := os.ReadFile(tuzhongPath)
+	// 读取图种文件（不限制大小）- 优化：直接提取隐藏数据避免重复读取
+	fmt.Printf("[DEBUG] 使用优化方法直接提取隐藏数据，ImageSize: %d\n", info.ImageSize)
+	hiddenData, err := g.extractHiddenDataFromTuzhong(tuzhongPath, info.ImageSize)
 	if err != nil {
-		return fmt.Errorf("读取图种文件失败: %v", err)
+		fmt.Printf("[ERROR] 提取隐藏数据失败: %v\n", err)
+		return fmt.Errorf("提取隐藏数据失败: %v", err)
 	}
-
-	// 提取隐藏数据
-	hiddenData := data[info.ImageSize:]
+	fmt.Printf("[DEBUG] 隐藏数据提取完成，大小: %d bytes\n", len(hiddenData))
 
 	// 发送提取进度
 	runtime.EventsEmit(g.ctx, "progress", map[string]interface{}{
@@ -602,6 +855,13 @@ func (g *Generator) ExtractFromTuzhong(tuzhongPath, outputDir string) error {
 	if err := os.MkdirAll(outputDir, 0755); err != nil {
 		return fmt.Errorf("创建输出目录失败: %v", err)
 	}
+
+	// 发送准备解压进度
+	runtime.EventsEmit(g.ctx, "progress", map[string]interface{}{
+		"step":    "extract",
+		"message": "准备解压文件...",
+		"percent": 50,
+	})
 
 	// 解压zip数据到目标目录
 	err = g.extractZipData(hiddenData, outputDir)
@@ -619,41 +879,102 @@ func (g *Generator) ExtractFromTuzhong(tuzhongPath, outputDir string) error {
 	return nil
 }
 
-// 检测图片信息
+// ExtractFromTuzhongWithInfo 使用预分析的信息进行提取，避免重复分析
+func (g *Generator) ExtractFromTuzhongWithInfo(tuzhongPath, outputDir string, imageSize int64) error {
+	fmt.Printf("[DEBUG] ExtractFromTuzhongWithInfo 开始执行，文件路径: %s，输出目录: %s，imageSize: %d\n", tuzhongPath, outputDir, imageSize)
+
+	// 获取工作槽位
+	g.workers <- struct{}{}
+	defer func() { <-g.workers }()
+
+	// 发送开始事件
+	runtime.EventsEmit(g.ctx, "progress", map[string]interface{}{
+		"step":    "start",
+		"message": "开始提取文件...",
+		"percent": 10,
+	})
+
+	// 发送解析进度
+	runtime.EventsEmit(g.ctx, "progress", map[string]interface{}{
+		"step":    "analyze",
+		"message": "使用已分析的信息...",
+		"percent": 20,
+	})
+
+	// 直接提取隐藏数据，避免重复读取
+	fmt.Printf("[DEBUG] 使用优化方法直接提取隐藏数据，ImageSize: %d\n", imageSize)
+	hiddenData, err := g.extractHiddenDataFromTuzhong(tuzhongPath, imageSize)
+	if err != nil {
+		fmt.Printf("[ERROR] 提取隐藏数据失败: %v\n", err)
+		return fmt.Errorf("提取隐藏数据失败: %v", err)
+	}
+	fmt.Printf("[DEBUG] 隐藏数据提取完成，大小: %d bytes\n", len(hiddenData))
+
+	// 发送提取进度
+	runtime.EventsEmit(g.ctx, "progress", map[string]interface{}{
+		"step":    "extract",
+		"message": "正在提取隐藏文件...",
+		"percent": 40,
+	})
+
+	// 确保输出目录存在
+	if err := os.MkdirAll(outputDir, 0755); err != nil {
+		return fmt.Errorf("创建输出目录失败: %v", err)
+	}
+
+	// 发送准备解压进度
+	runtime.EventsEmit(g.ctx, "progress", map[string]interface{}{
+		"step":    "extract",
+		"message": "准备解压文件...",
+		"percent": 50,
+	})
+
+	// 解压zip数据到目标目录
+	err = g.extractZipData(hiddenData, outputDir)
+	if err != nil {
+		return fmt.Errorf("提取文件失败: %v", err)
+	}
+
+	// 发送完成事件
+	runtime.EventsEmit(g.ctx, "progress", map[string]interface{}{
+		"step":    "complete",
+		"message": "提取完成！",
+		"percent": 100,
+	})
+
+	return nil
+}
+
+// 选择提取位置
+func (g *Generator) SelectExtractLocation() (string, error) {
+	folder, err := runtime.OpenDirectoryDialog(g.ctx, runtime.OpenDialogOptions{
+		Title: "选择提取位置",
+	})
+	return folder, err
+}
+
+// 检测图片信息 - 优化版本
 func (g *Generator) detectImageInfo(data []byte) (int64, string, error) {
 	if len(data) < 4 {
 		return 0, "", fmt.Errorf("文件太小")
 	}
 
-	// JPEG
+	// JPEG - 优化的检测逻辑
 	if len(data) >= 2 && data[0] == 0xFF && data[1] == 0xD8 {
-		// 查找JPEG结束标记 FF D9
-		// 从后往前查找，因为图种的zip数据在图片之后
+		// 从后往前查找结束标记，提高效率
 		for i := len(data) - 2; i >= 2; i-- {
 			if data[i] == 0xFF && data[i+1] == 0xD9 {
-				// 找到了JPEG结束标记
-				jpegSize := int64(i + 2)
-				// 验证这个位置之后是否有数据
-				if jpegSize < int64(len(data)) {
-					// 检查后面的数据是否看起来像zip
-					remaining := data[jpegSize:]
-					if len(remaining) >= 4 && remaining[0] == 0x50 && remaining[1] == 0x4B {
-						return jpegSize, "JPEG", nil
-					}
-				}
+				return int64(i + 2), "JPEG", nil
 			}
 		}
-		// 如果没找到合理的结束标记，可能整个文件都是图片
 		return int64(len(data)), "JPEG", nil
 	}
 
-	// PNG
+	// PNG - 优化的IEND查找
 	if len(data) >= 8 && data[0] == 0x89 && data[1] == 0x50 && data[2] == 0x4E && data[3] == 0x47 {
-		// PNG的结构更复杂，查找IEND chunk
+		// 查找IEND chunk
 		for i := len(data) - 12; i >= 8; i-- {
 			if i+8 <= len(data) && string(data[i:i+4]) == "IEND" {
-				// IEND chunk包含4字节长度 + 4字节类型 + 4字节CRC = 12字节
-				// 但实际上IEND的长度字段是0，所以是0+4+4 = 8字节
 				return int64(i + 8), "PNG", nil
 			}
 		}
@@ -662,7 +983,6 @@ func (g *Generator) detectImageInfo(data []byte) (int64, string, error) {
 
 	// GIF
 	if len(data) >= 6 && (string(data[0:6]) == "GIF87a" || string(data[0:6]) == "GIF89a") {
-		// GIF以 0x3B 结束
 		for i := len(data) - 1; i >= 6; i-- {
 			if data[i] == 0x3B {
 				return int64(i + 1), "GIF", nil
@@ -673,10 +993,9 @@ func (g *Generator) detectImageInfo(data []byte) (int64, string, error) {
 
 	// WebP
 	if len(data) >= 12 && string(data[0:4]) == "RIFF" && string(data[8:12]) == "WEBP" {
-		// WebP文件大小在第4-7字节（小端序）
 		size := uint32(data[4]) | uint32(data[5])<<8 | uint32(data[6])<<16 | uint32(data[7])<<24
-		webpSize := int64(size + 8) // +8 for RIFF header
-		if webpSize <= int64(len(data)) {
+		webpSize := int64(size + 8)
+		if webpSize <= int64(len(data)) && webpSize > 0 {
 			return webpSize, "WEBP", nil
 		}
 		return int64(len(data)), "WEBP", nil
@@ -684,7 +1003,6 @@ func (g *Generator) detectImageInfo(data []byte) (int64, string, error) {
 
 	// BMP
 	if len(data) >= 14 && data[0] == 0x42 && data[1] == 0x4D {
-		// BMP文件大小在第2-5字节（小端序）
 		size := uint32(data[2]) | uint32(data[3])<<8 | uint32(data[4])<<16 | uint32(data[5])<<24
 		if int64(size) <= int64(len(data)) && size > 0 {
 			return int64(size), "BMP", nil
@@ -723,7 +1041,6 @@ func (g *Generator) analyzeZipData(zipData []byte) ([]string, error) {
 // 验证zip文件数据结构
 func (g *Generator) validateZipData(data []byte) error {
 	// 查找End of Central Directory Record (EOCD)
-	// EOCD signature: 0x06054b50
 	eocdPos := -1
 	for i := len(data) - 22; i >= 0; i-- {
 		if len(data) >= i+4 &&
@@ -761,16 +1078,30 @@ func (g *Generator) validateZipData(data []byte) error {
 	return nil
 }
 
-// 提取zip数据到目录
+// 提取zip数据到目录 - 优化版本
 func (g *Generator) extractZipData(zipData []byte, outputDir string) error {
 	if len(zipData) < 22 {
 		return fmt.Errorf("zip数据太小，至少需要22字节")
 	}
 
+	// 发送验证进度
+	runtime.EventsEmit(g.ctx, "progress", map[string]interface{}{
+		"step":    "extract",
+		"message": "验证zip文件结构...",
+		"percent": 55,
+	})
+
 	// 验证zip文件结构
 	if err := g.validateZipData(zipData); err != nil {
 		return fmt.Errorf("zip文件验证失败: %v", err)
 	}
+
+	// 发送打开进度
+	runtime.EventsEmit(g.ctx, "progress", map[string]interface{}{
+		"step":    "extract",
+		"message": "打开zip文件...",
+		"percent": 60,
+	})
 
 	// 创建内存中的zip读取器
 	reader, err := zip.NewReader(bytes.NewReader(zipData), int64(len(zipData)))
@@ -794,42 +1125,80 @@ func (g *Generator) extractZipData(zipData []byte, outputDir string) error {
 			})
 		}
 
-		// 构建输出路径
-		outputPath := filepath.Join(outputDir, file.Name)
-
-		// 确保目录存在
-		if file.FileInfo().IsDir() {
-			os.MkdirAll(outputPath, file.FileInfo().Mode())
-			continue
-		}
-
-		// 确保父目录存在
-		if err := os.MkdirAll(filepath.Dir(outputPath), 0755); err != nil {
-			return fmt.Errorf("创建目录失败: %v", err)
-		}
-
-		// 打开zip中的文件
-		rc, err := file.Open()
+		err := g.extractSingleFileOptimized(file, outputDir)
 		if err != nil {
-			return fmt.Errorf("打开zip文件失败: %v", err)
-		}
-
-		// 创建输出文件
-		outFile, err := os.Create(outputPath)
-		if err != nil {
-			rc.Close()
-			return fmt.Errorf("创建输出文件失败: %v", err)
-		}
-
-		// 复制文件内容
-		_, err = io.Copy(outFile, rc)
-		rc.Close()
-		outFile.Close()
-
-		if err != nil {
-			return fmt.Errorf("复制文件内容失败: %v", err)
+			return fmt.Errorf("提取文件 %s 失败: %v", file.Name, err)
 		}
 	}
 
 	return nil
+}
+
+// 优化的单文件提取
+func (g *Generator) extractSingleFileOptimized(file *zip.File, outputDir string) error {
+	// 安全检查文件路径
+	if strings.Contains(file.Name, "..") {
+		return fmt.Errorf("不安全的文件路径: %s", file.Name)
+	}
+
+	targetPath := filepath.Join(outputDir, file.Name)
+
+	// 确保目录存在
+	if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
+		return err
+	}
+
+	// 如果是目录，创建目录并返回
+	if file.FileInfo().IsDir() {
+		return os.MkdirAll(targetPath, file.FileInfo().Mode())
+	}
+
+	// 打开zip中的文件
+	rc, err := file.Open()
+	if err != nil {
+		return err
+	}
+	defer rc.Close()
+
+	// 创建目标文件
+	targetFile, err := os.Create(targetPath)
+	if err != nil {
+		return err
+	}
+	defer targetFile.Close()
+
+	// 使用缓冲区复制文件
+	buffer := g.getBuffer()
+	defer g.putBuffer(buffer)
+
+	_, err = io.CopyBuffer(targetFile, rc, buffer)
+	return err
+}
+
+// extractHiddenDataFromTuzhong 直接从图种文件中提取隐藏数据，避免读取整个文件
+func (g *Generator) extractHiddenDataFromTuzhong(tuzhongPath string, imageSize int64) ([]byte, error) {
+	fmt.Printf("[DEBUG] extractHiddenDataFromTuzhong: 打开文件 %s, imageSize: %d\n", tuzhongPath, imageSize)
+
+	file, err := os.Open(tuzhongPath)
+	if err != nil {
+		return nil, fmt.Errorf("打开文件失败: %v", err)
+	}
+	defer file.Close()
+
+	// 跳过图片部分，直接定位到隐藏数据
+	fmt.Printf("[DEBUG] 跳过图片部分，定位到偏移量: %d\n", imageSize)
+	_, err = file.Seek(imageSize, 0)
+	if err != nil {
+		return nil, fmt.Errorf("定位文件位置失败: %v", err)
+	}
+
+	// 读取剩余的隐藏数据
+	fmt.Println("[DEBUG] 开始读取隐藏数据...")
+	hiddenData, err := io.ReadAll(file)
+	if err != nil {
+		return nil, fmt.Errorf("读取隐藏数据失败: %v", err)
+	}
+
+	fmt.Printf("[DEBUG] 隐藏数据读取完成，大小: %d bytes\n", len(hiddenData))
+	return hiddenData, nil
 }

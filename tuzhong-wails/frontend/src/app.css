@@ -1388,3 +1388,436 @@ body.theme-light [data-drop-target].wails-drop-target-active .button-group .file
     background: rgba(78, 205, 196, 0.2);
     color: rgba(15, 23, 42, 0.85);
 }
+
+/* ===== 设置界面样式 ===== */
+
+.settings-section {
+    padding: 20px;
+    background: rgba(30, 41, 59, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+    backdrop-filter: blur(10px);
+    transition: all 0.3s ease;
+}
+
+.settings-title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 0 0 24px 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #e2e8f0;
+}
+
+.settings-title svg {
+    width: 20px;
+    height: 20px;
+    color: #6366f1;
+}
+
+.settings-form {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.setting-item {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 16px;
+    background: rgba(51, 65, 85, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    transition: all 0.3s ease;
+}
+
+.setting-item:hover {
+    background: rgba(51, 65, 85, 0.5);
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.setting-label {
+    flex: 1;
+}
+
+.setting-label label {
+    font-weight: 600;
+    color: #e2e8f0;
+    margin-bottom: 4px;
+    display: block;
+}
+
+.setting-description {
+    font-size: 0.875rem;
+    color: #94a3b8;
+    margin: 0;
+    line-height: 1.4;
+}
+
+.setting-control {
+    flex-shrink: 0;
+}
+
+/* 开关按钮样式 */
+.toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 50px;
+    height: 24px;
+}
+
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(71, 85, 105, 0.8);
+    transition: 0.3s;
+    border-radius: 24px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.toggle-slider:before {
+    position: absolute;
+    content: "";
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 2px;
+    background-color: #e2e8f0;
+    transition: 0.3s;
+    border-radius: 50%;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+input:checked + .toggle-slider {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
+input:checked + .toggle-slider:before {
+    transform: translateX(26px);
+    background-color: #fff;
+}
+
+/* 大小输入组样式 */
+.size-input-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(51, 65, 85, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 2px;
+}
+
+.size-input-group input {
+    background: transparent;
+    border: none;
+    padding: 8px 12px;
+    color: #e2e8f0;
+    font-size: 0.875rem;
+    width: 80px;
+    outline: none;
+}
+
+.size-input-group input:focus {
+    background: rgba(99, 102, 241, 0.1);
+}
+
+.size-input-group select {
+    background: rgba(51, 65, 85, 0.6);
+    border: none;
+    color: #e2e8f0;
+    padding: 8px 12px;
+    border-radius: 6px;
+    outline: none;
+    cursor: pointer;
+}
+
+.size-input-group select:focus {
+    background: rgba(99, 102, 241, 0.2);
+}
+
+/* 禁用状态 */
+.form-group.disabled {
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+.form-group.disabled .setting-item {
+    background: rgba(51, 65, 85, 0.15);
+}
+
+/* 快速设置样式 */
+.quick-settings {
+    padding: 16px;
+    background: rgba(51, 65, 85, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+}
+
+.quick-settings h4 {
+    margin: 0 0 12px 0;
+    color: #e2e8f0;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.quick-buttons {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.quick-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    background: rgba(51, 65, 85, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    color: #e2e8f0;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.quick-btn:hover {
+    background: rgba(99, 102, 241, 0.2);
+    border-color: rgba(99, 102, 241, 0.4);
+    color: #a5b4fc;
+}
+
+.quick-btn.danger {
+    border-color: rgba(239, 68, 68, 0.3);
+    color: #fca5a5;
+}
+
+.quick-btn.danger:hover {
+    background: rgba(239, 68, 68, 0.2);
+    border-color: rgba(239, 68, 68, 0.5);
+    color: #f87171;
+}
+
+.quick-btn svg {
+    width: 14px;
+    height: 14px;
+}
+
+/* 浅色主题适配 */
+body.theme-light .settings-section {
+    background: rgba(255, 255, 255, 0.8);
+    border-color: rgba(15, 23, 42, 0.1);
+}
+
+body.theme-light .settings-title {
+    color: #1e293b;
+}
+
+body.theme-light .setting-item {
+    background: rgba(248, 250, 252, 0.8);
+    border-color: rgba(15, 23, 42, 0.1);
+}
+
+body.theme-light .setting-item:hover {
+    background: rgba(241, 245, 249, 0.9);
+    border-color: rgba(15, 23, 42, 0.2);
+}
+
+body.theme-light .setting-label label {
+    color: #1e293b;
+}
+
+body.theme-light .setting-description {
+    color: #64748b;
+}
+
+body.theme-light .toggle-slider {
+    background-color: rgba(203, 213, 225, 0.8);
+    border-color: rgba(15, 23, 42, 0.1);
+}
+
+body.theme-light .toggle-slider:before {
+    background-color: #1e293b;
+}
+
+body.theme-light input:checked + .toggle-slider:before {
+    background-color: #fff;
+}
+
+body.theme-light .size-input-group {
+    background: rgba(248, 250, 252, 0.6);
+    border-color: rgba(15, 23, 42, 0.1);
+}
+
+body.theme-light .size-input-group input {
+    color: #1e293b;
+}
+
+body.theme-light .size-input-group input:focus {
+    background: rgba(99, 102, 241, 0.1);
+}
+
+body.theme-light .size-input-group select {
+    background: rgba(248, 250, 252, 0.8);
+    color: #1e293b;
+}
+
+body.theme-light .size-input-group select:focus {
+    background: rgba(99, 102, 241, 0.1);
+}
+
+body.theme-light .quick-settings {
+    background: rgba(248, 250, 252, 0.6);
+    border-color: rgba(15, 23, 42, 0.1);
+}
+
+body.theme-light .quick-settings h4 {
+    color: #1e293b;
+}
+
+body.theme-light .quick-btn {
+    background: rgba(248, 250, 252, 0.8);
+    border-color: rgba(15, 23, 42, 0.1);
+    color: #1e293b;
+}
+
+body.theme-light .quick-btn:hover {
+    background: rgba(99, 102, 241, 0.1);
+    border-color: rgba(99, 102, 241, 0.3);
+    color: #6366f1;
+}
+
+body.theme-light .quick-btn.danger {
+    border-color: rgba(239, 68, 68, 0.2);
+    color: #dc2626;
+}
+
+body.theme-light .quick-btn.danger:hover {
+    background: rgba(239, 68, 68, 0.1);
+    border-color: rgba(239, 68, 68, 0.3);
+    color: #ef4444;
+}
+
+/* 性能监控样式 */
+.performance-monitor {
+    background: rgba(15, 23, 42, 0.8);
+    border: 1px solid rgba(71, 85, 105, 0.3);
+    border-radius: 12px;
+    padding: 20px;
+    margin-top: 16px;
+}
+
+.performance-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+.stat-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    background: rgba(30, 41, 59, 0.6);
+    border: 1px solid rgba(71, 85, 105, 0.2);
+    border-radius: 8px;
+    transition: all 0.3s ease;
+}
+
+.stat-item:hover {
+    background: rgba(30, 41, 59, 0.8);
+    border-color: rgba(99, 102, 241, 0.3);
+}
+
+.stat-item label {
+    font-size: 14px;
+    color: #94a3b8;
+    font-weight: 500;
+}
+
+.stat-value {
+    font-size: 16px;
+    font-weight: 700;
+    color: #60a5fa;
+    text-align: right;
+}
+
+.performance-actions {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+}
+
+.memory-warning {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px;
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    border-radius: 8px;
+    color: #fca5a5;
+    font-size: 14px;
+    animation: pulse 2s infinite;
+}
+
+.memory-warning svg {
+    width: 18px;
+    height: 18px;
+    color: #ef4444;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.7;
+    }
+}
+
+/* 浅色主题下的性能监控样式 */
+body.theme-light .performance-monitor {
+    background: rgba(255, 255, 255, 0.9);
+    border-color: rgba(203, 213, 225, 0.5);
+}
+
+body.theme-light .stat-item {
+    background: rgba(248, 250, 252, 0.8);
+    border-color: rgba(203, 213, 225, 0.3);
+}
+
+body.theme-light .stat-item:hover {
+    background: rgba(248, 250, 252, 1);
+    border-color: rgba(99, 102, 241, 0.3);
+}
+
+body.theme-light .stat-item label {
+    color: #64748b;
+}
+
+body.theme-light .stat-value {
+    color: #2563eb;
+}
+
+body.theme-light .memory-warning {
+    background: rgba(254, 242, 242, 0.9);
+    border-color: rgba(239, 68, 68, 0.3);
+    color: #dc2626;
+}

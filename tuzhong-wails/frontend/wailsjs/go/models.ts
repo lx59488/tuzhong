@@ -1,5 +1,94 @@
 export namespace backend {
 	
+	export class SecurityConfig {
+	    validateFilePaths: boolean;
+	    allowedExtensions: string[];
+	    blockUnsafePaths: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new SecurityConfig(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.validateFilePaths = source["validateFilePaths"];
+	        this.allowedExtensions = source["allowedExtensions"];
+	        this.blockUnsafePaths = source["blockUnsafePaths"];
+	    }
+	}
+	export class PerformanceConfig {
+	    chunkSize: number;
+	    maxWorkers: number;
+	    bufferPoolSize: number;
+	    progressInterval: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new PerformanceConfig(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.chunkSize = source["chunkSize"];
+	        this.maxWorkers = source["maxWorkers"];
+	        this.bufferPoolSize = source["bufferPoolSize"];
+	        this.progressInterval = source["progressInterval"];
+	    }
+	}
+	export class FileSizeLimits {
+	    maxImageSize: number;
+	    maxZipSize: number;
+	    maxGeneralFile: number;
+	    enableSizeCheck: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new FileSizeLimits(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.maxImageSize = source["maxImageSize"];
+	        this.maxZipSize = source["maxZipSize"];
+	        this.maxGeneralFile = source["maxGeneralFile"];
+	        this.enableSizeCheck = source["enableSizeCheck"];
+	    }
+	}
+	export class AppConfig {
+	    fileSizeLimits: FileSizeLimits;
+	    performance: PerformanceConfig;
+	    security: SecurityConfig;
+	
+	    static createFrom(source: any = {}) {
+	        return new AppConfig(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.fileSizeLimits = this.convertValues(source["fileSizeLimits"], FileSizeLimits);
+	        this.performance = this.convertValues(source["performance"], PerformanceConfig);
+	        this.security = this.convertValues(source["security"], SecurityConfig);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	
+	
 	export class TuzhongInfo {
 	    imageSize: number;
 	    hiddenSize: number;

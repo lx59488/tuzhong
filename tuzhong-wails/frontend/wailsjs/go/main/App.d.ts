@@ -4,13 +4,27 @@ import {backend} from '../models';
 
 export function AnalyzeTuzhong(arg1:string):Promise<backend.TuzhongInfo>;
 
+export function DisableFileSizeCheck():Promise<void>;
+
+export function EnableFileSizeCheck():Promise<void>;
+
 export function ExtractFromTuzhong(arg1:string,arg2:string):Promise<void>;
 
+export function ExtractFromTuzhongWithInfo(arg1:string,arg2:string,arg3:number):Promise<void>;
+
+export function GetConfig():Promise<backend.AppConfig>;
+
 export function GetImageBase64(arg1:string):Promise<string>;
+
+export function GetTuzhongImageBase64(arg1:string):Promise<string>;
+
+export function GetTuzhongImageBase64Async(arg1:string):Promise<void>;
 
 export function MergeFiles(arg1:string,arg2:string,arg3:string):Promise<string>;
 
 export function OpenFileLocation(arg1:string):Promise<void>;
+
+export function RemoveAllSizeLimits():Promise<void>;
 
 export function SelectExtractLocation(arg1:string):Promise<string>;
 
@@ -23,3 +37,23 @@ export function SelectImageFile():Promise<string>;
 export function SelectSaveLocation(arg1:string):Promise<string>;
 
 export function SelectTuzhongFile():Promise<string>;
+
+export function SetImageSizeLimit1GB():Promise<void>;
+
+export function SetImageSizeLimit2GB():Promise<void>;
+
+export function SetImageSizeLimit5GB():Promise<void>;
+
+export function SetMaxGeneralFileSize(arg1:number):Promise<void>;
+
+export function SetMaxImageSize(arg1:number):Promise<void>;
+
+export function SetMaxZipSize(arg1:number):Promise<void>;
+
+export function SetUnlimitedGeneralFileSize():Promise<void>;
+
+export function SetUnlimitedImageSize():Promise<void>;
+
+export function SetUnlimitedZipSize():Promise<void>;
+
+export function UpdateFileSizeLimits(arg1:backend.FileSizeLimits):Promise<void>;

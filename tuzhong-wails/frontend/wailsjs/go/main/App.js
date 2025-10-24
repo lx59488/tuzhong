@@ -6,12 +6,36 @@ export function AnalyzeTuzhong(arg1) {
   return window['go']['main']['App']['AnalyzeTuzhong'](arg1);
 }
 
+export function DisableFileSizeCheck() {
+  return window['go']['main']['App']['DisableFileSizeCheck']();
+}
+
+export function EnableFileSizeCheck() {
+  return window['go']['main']['App']['EnableFileSizeCheck']();
+}
+
 export function ExtractFromTuzhong(arg1, arg2) {
   return window['go']['main']['App']['ExtractFromTuzhong'](arg1, arg2);
 }
 
+export function ExtractFromTuzhongWithInfo(arg1, arg2, arg3) {
+  return window['go']['main']['App']['ExtractFromTuzhongWithInfo'](arg1, arg2, arg3);
+}
+
+export function GetConfig() {
+  return window['go']['main']['App']['GetConfig']();
+}
+
 export function GetImageBase64(arg1) {
   return window['go']['main']['App']['GetImageBase64'](arg1);
+}
+
+export function GetTuzhongImageBase64(arg1) {
+  return window['go']['main']['App']['GetTuzhongImageBase64'](arg1);
+}
+
+export function GetTuzhongImageBase64Async(arg1) {
+  return window['go']['main']['App']['GetTuzhongImageBase64Async'](arg1);
 }
 
 export function MergeFiles(arg1, arg2, arg3) {
@@ -20,6 +44,10 @@ export function MergeFiles(arg1, arg2, arg3) {
 
 export function OpenFileLocation(arg1) {
   return window['go']['main']['App']['OpenFileLocation'](arg1);
+}
+
+export function RemoveAllSizeLimits() {
+  return window['go']['main']['App']['RemoveAllSizeLimits']();
 }
 
 export function SelectExtractLocation(arg1) {
@@ -44,4 +72,44 @@ export function SelectSaveLocation(arg1) {
 
 export function SelectTuzhongFile() {
   return window['go']['main']['App']['SelectTuzhongFile']();
+}
+
+export function SetImageSizeLimit1GB() {
+  return window['go']['main']['App']['SetImageSizeLimit1GB']();
+}
+
+export function SetImageSizeLimit2GB() {
+  return window['go']['main']['App']['SetImageSizeLimit2GB']();
+}
+
+export function SetImageSizeLimit5GB() {
+  return window['go']['main']['App']['SetImageSizeLimit5GB']();
+}
+
+export function SetMaxGeneralFileSize(arg1) {
+  return window['go']['main']['App']['SetMaxGeneralFileSize'](arg1);
+}
+
+export function SetMaxImageSize(arg1) {
+  return window['go']['main']['App']['SetMaxImageSize'](arg1);
+}
+
+export function SetMaxZipSize(arg1) {
+  return window['go']['main']['App']['SetMaxZipSize'](arg1);
+}
+
+export function SetUnlimitedGeneralFileSize() {
+  return window['go']['main']['App']['SetUnlimitedGeneralFileSize']();
+}
+
+export function SetUnlimitedImageSize() {
+  return window['go']['main']['App']['SetUnlimitedImageSize']();
+}
+
+export function SetUnlimitedZipSize() {
+  return window['go']['main']['App']['SetUnlimitedZipSize']();
+}
+
+export function UpdateFileSizeLimits(arg1) {
+  return window['go']['main']['App']['UpdateFileSizeLimits'](arg1);
 }
