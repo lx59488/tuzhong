@@ -1,5 +1,29 @@
 export namespace backend {
 	
+	export class LoggingConfig {
+	    level: string;
+	    enableColors: boolean;
+	    enableFile: boolean;
+	    enableConsole: boolean;
+	    logDir: string;
+	    maxFileSize: number;
+	    maxFiles: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new LoggingConfig(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.level = source["level"];
+	        this.enableColors = source["enableColors"];
+	        this.enableFile = source["enableFile"];
+	        this.enableConsole = source["enableConsole"];
+	        this.logDir = source["logDir"];
+	        this.maxFileSize = source["maxFileSize"];
+	        this.maxFiles = source["maxFiles"];
+	    }
+	}
 	export class SecurityConfig {
 	    validateFilePaths: boolean;
 	    allowedExtensions: string[];
@@ -56,6 +80,7 @@ export namespace backend {
 	    fileSizeLimits: FileSizeLimits;
 	    performance: PerformanceConfig;
 	    security: SecurityConfig;
+	    logging: LoggingConfig;
 	
 	    static createFrom(source: any = {}) {
 	        return new AppConfig(source);
@@ -66,6 +91,7 @@ export namespace backend {
 	        this.fileSizeLimits = this.convertValues(source["fileSizeLimits"], FileSizeLimits);
 	        this.performance = this.convertValues(source["performance"], PerformanceConfig);
 	        this.security = this.convertValues(source["security"], SecurityConfig);
+	        this.logging = this.convertValues(source["logging"], LoggingConfig);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -86,6 +112,7 @@ export namespace backend {
 		    return a;
 		}
 	}
+	
 	
 	
 	

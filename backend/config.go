@@ -16,6 +16,9 @@ type AppConfig struct {
 
 	// 安全配置
 	Security SecurityConfig `json:"security"`
+
+	// 日志配置
+	Logging LoggingConfig `json:"logging"`
 }
 
 // FileSizeLimits 文件大小限制配置
@@ -41,6 +44,17 @@ type SecurityConfig struct {
 	BlockUnsafePaths  bool     `json:"blockUnsafePaths"`  // 是否阻止不安全路径
 }
 
+// LoggingConfig 日志配置
+type LoggingConfig struct {
+	Level         string `json:"level"`         // 日志级别: "debug", "info", "warn", "error", "fatal"
+	EnableColors  bool   `json:"enableColors"`  // 启用颜色输出
+	EnableFile    bool   `json:"enableFile"`    // 启用文件日志
+	EnableConsole bool   `json:"enableConsole"` // 启用控制台日志
+	LogDir        string `json:"logDir"`        // 日志目录
+	MaxFileSize   int64  `json:"maxFileSize"`   // 最大日志文件大小(MB)
+	MaxFiles      int    `json:"maxFiles"`      // 最大保留文件数
+}
+
 // DefaultConfig 返回默认配置
 func DefaultConfig() *AppConfig {
 	return &AppConfig{
@@ -60,6 +74,15 @@ func DefaultConfig() *AppConfig {
 			ValidateFilePaths: true,
 			AllowedExtensions: []string{".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".zip", ".rar", ".7z"},
 			BlockUnsafePaths:  true,
+		},
+		Logging: LoggingConfig{
+			Level:         "info",
+			EnableColors:  true,
+			EnableFile:    true,
+			EnableConsole: true,
+			LogDir:        "logs",
+			MaxFileSize:   10, // 10MB
+			MaxFiles:      5,
 		},
 	}
 }
@@ -82,21 +105,26 @@ func NewConfigManager(configPath string) *ConfigManager {
 func (cm *ConfigManager) LoadConfig() error {
 	if _, err := os.Stat(cm.configPath); os.IsNotExist(err) {
 		// 配置文件不存在，使用默认配置并保存
+		Info("Configuration file not found, creating default config: %s", cm.configPath)
 		return cm.SaveConfig()
 	}
 
+	Debug("Loading configuration from: %s", cm.configPath)
 	data, err := os.ReadFile(cm.configPath)
 	if err != nil {
+		Error("Failed to read configuration file: %v", err)
 		return err
 	}
 
 	err = json.Unmarshal(data, cm.config)
 	if err != nil {
 		// 如果配置文件损坏，使用默认配置
+		Warn("Configuration file corrupted, using default config: %v", err)
 		cm.config = DefaultConfig()
 		return cm.SaveConfig()
 	}
 
+	Info("Configuration loaded successfully from: %s", cm.configPath)
 	return nil
 }
 
@@ -105,15 +133,25 @@ func (cm *ConfigManager) SaveConfig() error {
 	// 确保配置目录存在
 	configDir := filepath.Dir(cm.configPath)
 	if err := os.MkdirAll(configDir, 0755); err != nil {
+		Error("Failed to create config directory %s: %v", configDir, err)
 		return err
 	}
 
+	Debug("Saving configuration to: %s", cm.configPath)
 	data, err := json.MarshalIndent(cm.config, "", "  ")
 	if err != nil {
+		Error("Failed to marshal configuration: %v", err)
 		return err
 	}
 
-	return os.WriteFile(cm.configPath, data, 0644)
+	err = os.WriteFile(cm.configPath, data, 0644)
+	if err != nil {
+		Error("Failed to write configuration file: %v", err)
+		return err
+	}
+
+	Info("Configuration saved successfully to: %s", cm.configPath)
+	return nil
 }
 
 // GetConfig 获取配置
@@ -174,13 +212,84 @@ func (cm *ConfigManager) RemoveAllSizeLimits() error {
 	return cm.SaveConfig()
 }
 
+// ApplyLoggingConfig 应用日志配置
+func (cm *ConfigManager) ApplyLoggingConfig() error {
+	logConfig := cm.config.Logging
+
+	// 将字符串级别转换为LogLevel
+	var level LogLevel
+	switch logConfig.Level {
+	case "debug":
+		level = LogLevelDebug
+	case "info":
+		level = LogLevelInfo
+	case "warn":
+		level = LogLevelWarn
+	case "error":
+		level = LogLevelError
+	case "fatal":
+		level = LogLevelFatal
+	default:
+		level = LogLevelInfo // 默认级别
+	}
+
+	// 创建日志配置
+	loggerConfig := &LoggerConfig{
+		Level:         level,
+		EnableColors:  logConfig.EnableColors,
+		EnableFile:    logConfig.EnableFile,
+		EnableConsole: logConfig.EnableConsole,
+		LogDir:        logConfig.LogDir,
+		MaxFileSize:   logConfig.MaxFileSize,
+		MaxFiles:      logConfig.MaxFiles,
+	}
+
+	// 重新初始化全局日志器
+	newLogger, err := NewLogger(loggerConfig)
+	if err != nil {
+		return err
+	}
+
+	// 关闭旧的日志器
+	if globalLogger != nil {
+		globalLogger.Close()
+	}
+
+	// 替换全局日志器
+	globalLogger = newLogger
+
+	Info("Logging configuration applied successfully - Level: %s, File: %t, Console: %t",
+		logConfig.Level, logConfig.EnableFile, logConfig.EnableConsole)
+
+	return nil
+}
+
+// UpdateLoggingConfig 更新日志配置
+func (cm *ConfigManager) UpdateLoggingConfig(config LoggingConfig) error {
+	cm.config.Logging = config
+
+	// 应用新的日志配置
+	if err := cm.ApplyLoggingConfig(); err != nil {
+		return err
+	}
+
+	return cm.SaveConfig()
+}
+
 // 全局配置管理器实例
 var GlobalConfigManager *ConfigManager
 
 // InitConfig 初始化配置系统
 func InitConfig(configPath string) error {
 	GlobalConfigManager = NewConfigManager(configPath)
-	return GlobalConfigManager.LoadConfig()
+
+	// 加载配置
+	if err := GlobalConfigManager.LoadConfig(); err != nil {
+		return err
+	}
+
+	// 应用日志配置
+	return GlobalConfigManager.ApplyLoggingConfig()
 }
 
 // GetGlobalConfig 获取全局配置

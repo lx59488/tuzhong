@@ -5,7 +5,8 @@ import (
 	"embed"
 	"os"
 	"path/filepath"
-	"tuzhong-wails/backend"
+
+	"github.com/lixin/tuzhong/backend"
 
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
@@ -36,12 +37,20 @@ func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 	a.generator.SetContext(ctx)
 
+	// 初始化日志系统
+	backend.Info("Application starting up...")
+
 	// 初始化配置系统
 	configPath := a.getConfigPath()
 	if err := backend.InitConfig(configPath); err != nil {
 		// 如果配置初始化失败，使用默认配置
+		backend.Warn("Failed to initialize config from %s, using default config: %v", configPath, err)
 		backend.GlobalConfigManager = backend.NewConfigManager(configPath)
+	} else {
+		backend.Info("Configuration initialized successfully from: %s", configPath)
 	}
+
+	backend.Info("Application startup completed")
 }
 
 // getConfigPath 获取配置文件路径
@@ -90,10 +99,15 @@ func (a *App) SelectExtractLocation(suggestedName string) (string, error) {
 
 // MergeFiles 包装后端的 MergeFiles 方法供前端访问
 func (a *App) MergeFiles(imagePath, targetPath, outputPath string) (string, error) {
+	backend.Info("Starting file merge operation: image=%s, target=%s, output=%s", imagePath, targetPath, outputPath)
+
 	err := a.generator.MergeFiles(imagePath, targetPath, outputPath)
 	if err != nil {
+		backend.Error("File merge operation failed: %v", err)
 		return "", err
 	}
+
+	backend.Info("File merge operation completed successfully: %s", outputPath)
 	return "合并完成", nil
 }
 
@@ -109,12 +123,31 @@ func (a *App) SelectTuzhongFile() (string, error) {
 
 // AnalyzeTuzhong 包装后端的 AnalyzeTuzhong 方法
 func (a *App) AnalyzeTuzhong(tuzhongPath string) (*backend.TuzhongInfo, error) {
-	return a.generator.AnalyzeTuzhong(tuzhongPath)
+	backend.Info("Starting tuzhong analysis: %s", tuzhongPath)
+
+	info, err := a.generator.AnalyzeTuzhong(tuzhongPath)
+	if err != nil {
+		backend.Error("Tuzhong analysis failed: %v", err)
+		return nil, err
+	}
+
+	backend.Info("Tuzhong analysis completed - Valid: %t, ImageSize: %d, HiddenSize: %d",
+		info.IsValid, info.ImageSize, info.HiddenSize)
+	return info, nil
 }
 
 // ExtractFromTuzhong 包装后端的 ExtractFromTuzhong 方法
 func (a *App) ExtractFromTuzhong(tuzhongPath, outputDir string) error {
-	return a.generator.ExtractFromTuzhong(tuzhongPath, outputDir)
+	backend.Info("Starting tuzhong extraction: %s -> %s", tuzhongPath, outputDir)
+
+	err := a.generator.ExtractFromTuzhong(tuzhongPath, outputDir)
+	if err != nil {
+		backend.Error("Tuzhong extraction failed: %v", err)
+		return err
+	}
+
+	backend.Info("Tuzhong extraction completed successfully: %s", outputDir)
+	return nil
 }
 
 // ExtractFromTuzhongWithInfo 使用预分析的信息进行提取，避免重复分析
@@ -175,6 +208,52 @@ func (a *App) SetMaxZipSize(size int64) error {
 		return backend.NewConfigError("CONFIG_NOT_INITIALIZED", "配置管理器未初始化")
 	}
 	return backend.GlobalConfigManager.SetMaxZipSize(size)
+}
+
+// GetLoggingConfig 获取日志配置
+func (a *App) GetLoggingConfig() (backend.LoggingConfig, error) {
+	if backend.GlobalConfigManager == nil {
+		return backend.LoggingConfig{}, backend.NewConfigError("CONFIG_NOT_INITIALIZED", "配置管理器未初始化")
+	}
+	return backend.GlobalConfigManager.GetConfig().Logging, nil
+}
+
+// UpdateLoggingConfig 更新日志配置
+func (a *App) UpdateLoggingConfig(config backend.LoggingConfig) error {
+	backend.Info("Updating logging configuration - Level: %s, File: %t, Console: %t",
+		config.Level, config.EnableFile, config.EnableConsole)
+
+	if backend.GlobalConfigManager == nil {
+		return backend.NewConfigError("CONFIG_NOT_INITIALIZED", "配置管理器未初始化")
+	}
+
+	err := backend.GlobalConfigManager.UpdateLoggingConfig(config)
+	if err != nil {
+		backend.Error("Failed to update logging configuration: %v", err)
+		return err
+	}
+
+	backend.Info("Logging configuration updated successfully")
+	return nil
+}
+
+// SetLogLevel 设置日志级别
+func (a *App) SetLogLevel(level string) error {
+	backend.Info("Setting log level to: %s", level)
+
+	if backend.GlobalConfigManager == nil {
+		return backend.NewConfigError("CONFIG_NOT_INITIALIZED", "配置管理器未初始化")
+	}
+
+	config := backend.GlobalConfigManager.GetConfig().Logging
+	config.Level = level
+
+	return backend.GlobalConfigManager.UpdateLoggingConfig(config)
+}
+
+// GetAvailableLogLevels 获取可用的日志级别
+func (a *App) GetAvailableLogLevels() []string {
+	return []string{"debug", "info", "warn", "error", "fatal"}
 }
 
 // SetMaxGeneralFileSize 设置最大一般文件大小（字节）

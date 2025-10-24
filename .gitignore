@@ -28,5 +28,32 @@ go.work.sum
 .env
 
 # Editor/IDE
-# .idea/
-# .vscode/
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Wails specific
+app.syso
+build/bin/
+wails_build_*
+
+# Node.js (for frontend)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Temporary directories
+tmp/
+temp/
+
+# Empty directories that may be left from migration
+tuzhong-wails/
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+Desktop.ini

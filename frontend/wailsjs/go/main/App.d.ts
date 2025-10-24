@@ -12,9 +12,13 @@ export function ExtractFromTuzhong(arg1:string,arg2:string):Promise<void>;
 
 export function ExtractFromTuzhongWithInfo(arg1:string,arg2:string,arg3:number):Promise<void>;
 
+export function GetAvailableLogLevels():Promise<Array<string>>;
+
 export function GetConfig():Promise<backend.AppConfig>;
 
 export function GetImageBase64(arg1:string):Promise<string>;
+
+export function GetLoggingConfig():Promise<backend.LoggingConfig>;
 
 export function GetTuzhongImageBase64(arg1:string):Promise<string>;
 
@@ -44,6 +48,8 @@ export function SetImageSizeLimit2GB():Promise<void>;
 
 export function SetImageSizeLimit5GB():Promise<void>;
 
+export function SetLogLevel(arg1:string):Promise<void>;
+
 export function SetMaxGeneralFileSize(arg1:number):Promise<void>;
 
 export function SetMaxImageSize(arg1:number):Promise<void>;
@@ -57,3 +63,5 @@ export function SetUnlimitedImageSize():Promise<void>;
 export function SetUnlimitedZipSize():Promise<void>;
 
 export function UpdateFileSizeLimits(arg1:backend.FileSizeLimits):Promise<void>;
+
+export function UpdateLoggingConfig(arg1:backend.LoggingConfig):Promise<void>;

@@ -22,12 +22,20 @@ export function ExtractFromTuzhongWithInfo(arg1, arg2, arg3) {
   return window['go']['main']['App']['ExtractFromTuzhongWithInfo'](arg1, arg2, arg3);
 }
 
+export function GetAvailableLogLevels() {
+  return window['go']['main']['App']['GetAvailableLogLevels']();
+}
+
 export function GetConfig() {
   return window['go']['main']['App']['GetConfig']();
 }
 
 export function GetImageBase64(arg1) {
   return window['go']['main']['App']['GetImageBase64'](arg1);
+}
+
+export function GetLoggingConfig() {
+  return window['go']['main']['App']['GetLoggingConfig']();
 }
 
 export function GetTuzhongImageBase64(arg1) {
@@ -86,6 +94,10 @@ export function SetImageSizeLimit5GB() {
   return window['go']['main']['App']['SetImageSizeLimit5GB']();
 }
 
+export function SetLogLevel(arg1) {
+  return window['go']['main']['App']['SetLogLevel'](arg1);
+}
+
 export function SetMaxGeneralFileSize(arg1) {
   return window['go']['main']['App']['SetMaxGeneralFileSize'](arg1);
 }
@@ -112,4 +124,8 @@ export function SetUnlimitedZipSize() {
 
 export function UpdateFileSizeLimits(arg1) {
   return window['go']['main']['App']['UpdateFileSizeLimits'](arg1);
+}
+
+export function UpdateLoggingConfig(arg1) {
+  return window['go']['main']['App']['UpdateLoggingConfig'](arg1);
 }

@@ -57,6 +57,9 @@ func NewGenerator() *Generator {
 		return make([]byte, ChunkSize)
 	}
 
+	// 记录生成器初始化日志
+	Info("Generator initialized with %d max workers, chunk size: %d bytes", MaxWorkers, ChunkSize)
+
 	return g
 }
 
@@ -65,6 +68,9 @@ func (g *Generator) SetContext(ctx context.Context) {
 	g.ctx = ctx
 	// 初始化错误处理中间件
 	g.errorHandler = NewErrorMiddleware(ctx)
+
+	// 记录上下文设置日志
+	Info("Generator context set and error middleware initialized")
 }
 
 // 优化的缓冲池管理
@@ -77,7 +83,8 @@ func (g *Generator) getBuffer() []byte {
 
 func (g *Generator) putBuffer(buf []byte) {
 	if cap(buf) == ChunkSize {
-		g.bufferPool.Put(buf[:0]) // 重置长度但保留容量
+		buf = buf[:0] // 重置长度但保留容量
+		g.bufferPool.Put(buf)
 	}
 }
 
@@ -789,7 +796,7 @@ func (g *Generator) AnalyzeTuzhong(tuzhongPath string) (*TuzhongInfo, error) {
 
 // 从图种中提取文件
 func (g *Generator) ExtractFromTuzhong(tuzhongPath, outputDir string) error {
-	fmt.Printf("[DEBUG] ExtractFromTuzhong 开始执行，文件路径: %s，输出目录: %s\n", tuzhongPath, outputDir)
+	Info("Starting tuzhong extraction: %s -> %s", tuzhongPath, outputDir)
 
 	// 立即发送初始进度事件
 	runtime.EventsEmit(g.ctx, "progress", map[string]interface{}{
@@ -797,13 +804,13 @@ func (g *Generator) ExtractFromTuzhong(tuzhongPath, outputDir string) error {
 		"message": "准备开始提取...",
 		"percent": 5,
 	})
-	fmt.Println("[DEBUG] 发送初始进度事件 5%")
+	Debug("Initial progress event sent (5%%)")
 
 	// 获取工作槽位
-	fmt.Println("[DEBUG] 尝试获取工作槽位...")
+	Debug("Acquiring worker slot...")
 	g.workers <- struct{}{}
 	defer func() { <-g.workers }()
-	fmt.Println("[DEBUG] 工作槽位获取成功")
+	Debug("Worker slot acquired successfully")
 
 	// 发送开始事件
 	runtime.EventsEmit(g.ctx, "progress", map[string]interface{}{
@@ -811,19 +818,20 @@ func (g *Generator) ExtractFromTuzhong(tuzhongPath, outputDir string) error {
 		"message": "开始解析图种...",
 		"percent": 10,
 	})
-	fmt.Println("[DEBUG] 发送开始进度事件 10%")
+	Debug("Start progress event sent (10%%)")
 
 	// 分析图种
-	fmt.Println("[DEBUG] 开始调用 AnalyzeTuzhong...")
+	Debug("Starting tuzhong analysis...")
 	info, err := g.AnalyzeTuzhong(tuzhongPath)
 	if err != nil {
-		fmt.Printf("[ERROR] AnalyzeTuzhong 失败: %v\n", err)
+		Error("Tuzhong analysis failed: %v", err)
 		return err
 	}
-	fmt.Printf("[DEBUG] AnalyzeTuzhong 完成，IsValid: %t\n", info.IsValid)
+	Info("Tuzhong analysis completed - Valid: %t, ImageSize: %d, HiddenSize: %d",
+		info.IsValid, info.ImageSize, info.HiddenSize)
 
 	if !info.IsValid {
-		fmt.Printf("[ERROR] 图种无效: %s\n", info.ErrorMessage)
+		Error("Invalid tuzhong file: %s", info.ErrorMessage)
 		return fmt.Errorf(info.ErrorMessage)
 	}
 
@@ -833,13 +841,13 @@ func (g *Generator) ExtractFromTuzhong(tuzhongPath, outputDir string) error {
 		"message": "正在解析图种结构...",
 		"percent": 20,
 	})
-	fmt.Println("[DEBUG] 发送解析进度事件 20%")
+	Debug("Analysis progress event sent (20%%)")
 
 	// 读取图种文件（不限制大小）- 优化：直接提取隐藏数据避免重复读取
-	fmt.Printf("[DEBUG] 使用优化方法直接提取隐藏数据，ImageSize: %d\n", info.ImageSize)
+	Debug("Extracting hidden data using optimized method, ImageSize: %d", info.ImageSize)
 	hiddenData, err := g.extractHiddenDataFromTuzhong(tuzhongPath, info.ImageSize)
 	if err != nil {
-		fmt.Printf("[ERROR] 提取隐藏数据失败: %v\n", err)
+		Error("Failed to extract hidden data: %v", err)
 		return fmt.Errorf("提取隐藏数据失败: %v", err)
 	}
 	fmt.Printf("[DEBUG] 隐藏数据提取完成，大小: %d bytes\n", len(hiddenData))

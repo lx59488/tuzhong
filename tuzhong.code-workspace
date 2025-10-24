@@ -1,0 +1,25 @@
+{
+    "folders": [
+        {
+            "name": "图种生成器",
+            "path": "."
+        }
+    ],
+    "settings": {
+        "go.toolsManagement.checkForUpdates": "local",
+        "go.useLanguageServer": true,
+        "go.gopath": "",
+        "go.goroot": "",
+        "files.exclude": {
+            "**/node_modules": true,
+            "**/dist": true,
+            "**/build": true
+        }
+    },
+    "extensions": {
+        "recommendations": [
+            "golang.go",
+            "ms-vscode.vscode-typescript-next"
+        ]
+    }
+}

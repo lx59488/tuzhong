@@ -44,6 +44,9 @@ func (m *ErrorMiddleware) HandleError(err error) *AppError {
 		appErr = WrapError(err, ErrCodeOperationFailed, "操作失败")
 	}
 
+	// 记录错误日志
+	m.logError(appErr)
+
 	// 调用错误处理器
 	if m.handler != nil {
 		m.handler.HandleError(appErr)
@@ -55,7 +58,62 @@ func (m *ErrorMiddleware) HandleError(err error) *AppError {
 	return appErr
 }
 
-// emitErrorToFrontend 发送错误事件到前端
+// logError 记录错误到日志系统
+func (m *ErrorMiddleware) logError(err *AppError) {
+	logger := GetGlobalLogger()
+
+	// 构建日志消息
+	logMsg := fmt.Sprintf("Error [%s]: %s", err.Code, err.Message)
+
+	// 添加详细信息
+	if err.Details != "" {
+		logMsg += fmt.Sprintf(" | Details: %s", err.Details)
+	}
+
+	// 添加上下文信息
+	if err.Context != nil {
+		contextStr := m.formatContext(err.Context)
+		if contextStr != "" {
+			logMsg += fmt.Sprintf(" | Context: %s", contextStr)
+		}
+	}
+
+	// 添加堆栈跟踪（如果有）
+	if err.Stack != "" {
+		logMsg += fmt.Sprintf(" | Stack: %s", err.Stack)
+	}
+
+	// 根据错误类型选择日志级别
+	switch err.Type {
+	case ErrorTypeUser, ErrorTypeValidation:
+		logger.Warn(logMsg)
+	case ErrorTypeSystem, ErrorTypeIO, ErrorTypeNetwork:
+		logger.Error(logMsg)
+	default:
+		logger.Error(logMsg)
+	}
+}
+
+// formatContext 格式化上下文信息
+func (m *ErrorMiddleware) formatContext(context map[string]interface{}) string {
+	if len(context) == 0 {
+		return ""
+	}
+
+	var parts []string
+	for k, v := range context {
+		// 过滤敏感信息
+		if !isSensitiveKey(k) {
+			parts = append(parts, fmt.Sprintf("%s=%v", k, v))
+		}
+	}
+
+	if len(parts) == 0 {
+		return ""
+	}
+
+	return fmt.Sprintf("{%s}", fmt.Sprintf("%v", parts))
+} // emitErrorToFrontend 发送错误事件到前端
 func (m *ErrorMiddleware) emitErrorToFrontend(err *AppError) {
 	if m.ctx == nil {
 		return
