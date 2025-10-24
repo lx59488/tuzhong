@@ -4,6 +4,10 @@ import {backend} from '../models';
 
 export function AnalyzeTuzhong(arg1:string):Promise<backend.TuzhongInfo>;
 
+export function AnalyzeTuzhongExtended(arg1:string):Promise<backend.ExtendedTuzhongInfo>;
+
+export function DetectDataFormat(arg1:string):Promise<string>;
+
 export function DisableFileSizeCheck():Promise<void>;
 
 export function EnableFileSizeCheck():Promise<void>;
@@ -12,6 +16,8 @@ export function ExtractFromTuzhong(arg1:string,arg2:string):Promise<void>;
 
 export function ExtractFromTuzhongWithInfo(arg1:string,arg2:string,arg3:number):Promise<void>;
 
+export function ExtractFromTuzhongWithPassword(arg1:string,arg2:string,arg3:string):Promise<void>;
+
 export function GetAvailableLogLevels():Promise<Array<string>>;
 
 export function GetConfig():Promise<backend.AppConfig>;
@@ -19,6 +25,8 @@ export function GetConfig():Promise<backend.AppConfig>;
 export function GetImageBase64(arg1:string):Promise<string>;
 
 export function GetLoggingConfig():Promise<backend.LoggingConfig>;
+
+export function GetSupportedFormats():Promise<Array<Record<string, any>>>;
 
 export function GetTuzhongImageBase64(arg1:string):Promise<string>;
 

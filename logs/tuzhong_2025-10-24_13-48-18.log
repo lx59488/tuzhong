@@ -1,0 +1,4 @@
+[32m[INFO][0m 2025-10-24 13:48:18.761 [logger.go:376] Generator initialized with 4 max workers, chunk size: 1048576 bytes
+[32m[INFO][0m 2025-10-24 13:48:19.258 [logger.go:376] Generator context set and error middleware initialized
+[32m[INFO][0m 2025-10-24 13:48:19.258 [logger.go:376] Application starting up...
+[32m[INFO][0m 2025-10-24 13:48:19.259 [logger.go:376] Configuration loaded successfully from: C:\Users\adminu\.tuzhong\config.json

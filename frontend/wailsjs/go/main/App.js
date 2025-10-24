@@ -6,6 +6,14 @@ export function AnalyzeTuzhong(arg1) {
   return window['go']['main']['App']['AnalyzeTuzhong'](arg1);
 }
 
+export function AnalyzeTuzhongExtended(arg1) {
+  return window['go']['main']['App']['AnalyzeTuzhongExtended'](arg1);
+}
+
+export function DetectDataFormat(arg1) {
+  return window['go']['main']['App']['DetectDataFormat'](arg1);
+}
+
 export function DisableFileSizeCheck() {
   return window['go']['main']['App']['DisableFileSizeCheck']();
 }
@@ -22,6 +30,10 @@ export function ExtractFromTuzhongWithInfo(arg1, arg2, arg3) {
   return window['go']['main']['App']['ExtractFromTuzhongWithInfo'](arg1, arg2, arg3);
 }
 
+export function ExtractFromTuzhongWithPassword(arg1, arg2, arg3) {
+  return window['go']['main']['App']['ExtractFromTuzhongWithPassword'](arg1, arg2, arg3);
+}
+
 export function GetAvailableLogLevels() {
   return window['go']['main']['App']['GetAvailableLogLevels']();
 }
@@ -36,6 +48,10 @@ export function GetImageBase64(arg1) {
 
 export function GetLoggingConfig() {
   return window['go']['main']['App']['GetLoggingConfig']();
+}
+
+export function GetSupportedFormats() {
+  return window['go']['main']['App']['GetSupportedFormats']();
 }
 
 export function GetTuzhongImageBase64(arg1) {

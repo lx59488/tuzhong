@@ -1,0 +1,3 @@
+[32m[INFO][0m 2025-10-24 13:48:19.261 [logger.go:376] Logging configuration applied successfully - Level: info, File: true, Console: true
+[32m[INFO][0m 2025-10-24 13:48:19.262 [logger.go:376] Configuration initialized successfully from: C:\Users\adminu\.tuzhong\config.json
+[32m[INFO][0m 2025-10-24 13:48:19.262 [logger.go:376] Application startup completed

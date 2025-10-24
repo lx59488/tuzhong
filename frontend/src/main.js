@@ -676,6 +676,27 @@ document.querySelector('#app').innerHTML = `
             </div>
         </div>
     </div>
+    
+    <!-- 自定义确认对话框 -->
+    <div id="confirmDialog" class="modal hidden">
+        <div class="modal-content confirm-dialog">
+            <div class="confirm-header">
+                <svg class="confirm-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <circle cx="12" cy="12" r="10"/>
+                    <line x1="9" y1="9" x2="15" y2="15"/>
+                    <line x1="15" y1="9" x2="9" y2="15"/>
+                </svg>
+                <h3 id="confirmTitle">确认操作</h3>
+            </div>
+            <div class="confirm-body">
+                <p id="confirmMessage">您确定要执行此操作吗？</p>
+            </div>
+            <div class="confirm-footer">
+                <button id="confirmCancelBtn" class="secondary-btn">取消</button>
+                <button id="confirmOkBtn" class="danger-btn">确定</button>
+            </div>
+        </div>
+    </div>
 `;
 
 document.getElementById('logo').src = logo;
@@ -727,6 +748,13 @@ let openLocationBtn = document.getElementById("openLocationBtn");
 let closeSuccessBtn = document.getElementById("closeSuccessBtn");
 let successTitle = successModal ? successModal.querySelector('.success-header h3') : null;
 
+// 确认对话框相关元素
+let confirmDialog = document.getElementById("confirmDialog");
+let confirmTitle = document.getElementById("confirmTitle");
+let confirmMessage = document.getElementById("confirmMessage");
+let confirmOkBtn = document.getElementById("confirmOkBtn");
+let confirmCancelBtn = document.getElementById("confirmCancelBtn");
+
 let selectedImagePath = "";
 let selectedTargetPath = "";
 let selectedTuzhongPath = "";
@@ -753,6 +781,67 @@ const progressStepContainers = {
     create: progressStepsCreate,
     extract: progressStepsExtract,
 };
+
+// 自定义确认对话框功能
+function showConfirm(message, title = '确认操作', okText = '确定', cancelText = '取消') {
+    return new Promise((resolve) => {
+        confirmTitle.textContent = title;
+        confirmMessage.textContent = message;
+        confirmOkBtn.textContent = okText;
+        confirmCancelBtn.textContent = cancelText;
+        
+        // 清理之前的事件监听器
+        const newOkBtn = confirmOkBtn.cloneNode(true);
+        const newCancelBtn = confirmCancelBtn.cloneNode(true);
+        confirmOkBtn.parentNode.replaceChild(newOkBtn, confirmOkBtn);
+        confirmCancelBtn.parentNode.replaceChild(newCancelBtn, confirmCancelBtn);
+        confirmOkBtn = newOkBtn;
+        confirmCancelBtn = newCancelBtn;
+        
+        // 添加新的事件监听器
+        confirmOkBtn.addEventListener('click', () => {
+            hideConfirm();
+            resolve(true);
+        });
+        
+        confirmCancelBtn.addEventListener('click', () => {
+            hideConfirm();
+            resolve(false);
+        });
+        
+        // ESC键取消
+        const handleEscape = (e) => {
+            if (e.key === 'Escape') {
+                document.removeEventListener('keydown', handleEscape);
+                hideConfirm();
+                resolve(false);
+            }
+        };
+        document.addEventListener('keydown', handleEscape);
+        
+        // 点击背景取消
+        const handleBackdropClick = (e) => {
+            if (e.target === confirmDialog) {
+                confirmDialog.removeEventListener('click', handleBackdropClick);
+                hideConfirm();
+                resolve(false);
+            }
+        };
+        confirmDialog.addEventListener('click', handleBackdropClick);
+        
+        // 显示对话框
+        confirmDialog.classList.remove('hidden');
+        
+        // 聚焦到取消按钮（更安全的默认选择）
+        setTimeout(() => {
+            confirmCancelBtn.focus();
+        }, 100);
+    });
+}
+
+function hideConfirm() {
+    confirmDialog.classList.add('hidden');
+}
 
 // 标签页切换功能
 createTab.addEventListener('click', function() {
@@ -2237,7 +2326,14 @@ document.getElementById('resetSettingsBtn').addEventListener('click', async func
 
 // 快速设置按钮
 document.getElementById('removeAllLimitsBtn').addEventListener('click', async function() {
-    if (!confirm('确定要移除所有文件大小限制吗？这将允许处理任意大小的文件，可能会影响性能。')) {
+    const confirmed = await showConfirm(
+        '确定要移除所有文件大小限制吗？这将允许处理任意大小的文件，可能会影响性能。',
+        '移除文件大小限制',
+        '移除限制',
+        '取消'
+    );
+    
+    if (!confirmed) {
         return;
     }
     
@@ -2376,29 +2472,139 @@ function handleMemoryWarning(event) {
 
 // 设置性能监控按钮事件
 function setupPerformanceButtons() {
+    console.log('Setting up performance buttons...');
+    
     // 刷新按钮
     const refreshBtn = document.getElementById('refreshPerformanceBtn');
     if (refreshBtn) {
-        refreshBtn.addEventListener('click', updatePerformanceDisplay);
+        console.log('Found refresh button, adding event listener');
+        refreshBtn.addEventListener('click', (e) => {
+            console.log('Refresh button clicked');
+            e.preventDefault();
+            
+            // 添加视觉反馈
+            refreshBtn.disabled = true;
+            refreshBtn.textContent = '刷新中...';
+            
+            try {
+                updatePerformanceDisplay();
+                showSuccessMessage('性能数据已刷新');
+                console.log('Performance data refreshed successfully');
+            } catch (error) {
+                console.error('Error refreshing performance data:', error);
+                showErrorMessage('刷新性能数据失败: ' + error.message);
+            } finally {
+                // 恢复按钮状态
+                setTimeout(() => {
+                    refreshBtn.disabled = false;
+                    refreshBtn.innerHTML = `
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                            <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
+                            <path d="M21 3v5h-5"/>
+                            <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/>
+                            <path d="M3 21v-5h5"/>
+                        </svg>
+                        刷新数据
+                    `;
+                }, 500);
+            }
+        });
+    } else {
+        console.warn('Refresh button not found in DOM');
     }
     
     // 清除数据按钮
     const clearBtn = document.getElementById('clearPerformanceBtn');
     if (clearBtn) {
-        clearBtn.addEventListener('click', () => {
-            if (window.performanceUtils) {
-                window.performanceUtils.performanceMetrics.operations = [];
-                window.performanceUtils.performanceMetrics.memoryUsage = [];
-                updatePerformanceDisplay();
-                showSuccessMessage('性能数据已清除');
+        console.log('Found clear button, adding event listener');
+        clearBtn.addEventListener('click', async (e) => {
+            console.log('Clear button clicked');
+            e.preventDefault();
+            
+            // 添加自定义确认对话框
+            const confirmed = await showConfirm(
+                '确定要清除所有性能数据吗？此操作不可撤销。',
+                '清除性能数据',
+                '清除数据',
+                '取消'
+            );
+            
+            if (!confirmed) {
+                return;
+            }
+            
+            // 添加视觉反馈
+            clearBtn.disabled = true;
+            clearBtn.textContent = '清除中...';
+            
+            try {
+                if (window.performanceUtils) {
+                    window.performanceUtils.performanceMetrics.operations = [];
+                    window.performanceUtils.performanceMetrics.memoryUsage = [];
+                    window.performanceUtils.performanceMetrics.sessionStart = Date.now();
+                    updatePerformanceDisplay();
+                    showSuccessMessage('性能数据已清除');
+                    console.log('Performance data cleared successfully');
+                } else {
+                    throw new Error('性能工具未初始化');
+                }
+            } catch (error) {
+                console.error('Error clearing performance data:', error);
+                showErrorMessage('清除性能数据失败: ' + error.message);
+            } finally {
+                // 恢复按钮状态
+                setTimeout(() => {
+                    clearBtn.disabled = false;
+                    clearBtn.innerHTML = `
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                            <path d="M3 6h18"/>
+                            <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
+                            <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+                        </svg>
+                        清除数据
+                    `;
+                }, 500);
             }
         });
+    } else {
+        console.warn('Clear button not found in DOM');
     }
     
     // 导出报告按钮
     const exportBtn = document.getElementById('exportPerformanceBtn');
     if (exportBtn) {
-        exportBtn.addEventListener('click', exportPerformanceReport);
+        console.log('Found export button, adding event listener');
+        exportBtn.addEventListener('click', (e) => {
+            console.log('Export button clicked');
+            e.preventDefault();
+            
+            // 添加视觉反馈
+            exportBtn.disabled = true;
+            exportBtn.textContent = '导出中...';
+            
+            try {
+                exportPerformanceReport();
+                console.log('Performance report exported successfully');
+            } catch (error) {
+                console.error('Error exporting performance report:', error);
+                showErrorMessage('导出性能报告失败: ' + error.message);
+            } finally {
+                // 恢复按钮状态
+                setTimeout(() => {
+                    exportBtn.disabled = false;
+                    exportBtn.innerHTML = `
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                            <polyline points="7,10 12,15 17,10"/>
+                            <line x1="12" y1="15" x2="12" y2="3"/>
+                        </svg>
+                        导出报告
+                    `;
+                }, 500);
+            }
+        });
+    } else {
+        console.warn('Export button not found in DOM');
     }
 }
 
@@ -2437,15 +2643,64 @@ function exportPerformanceReport() {
 
 // 在DOM加载完成后初始化性能监控
 document.addEventListener('DOMContentLoaded', () => {
-    // 确保性能工具已加载
-    if (window.performanceUtils) {
-        initPerformanceMonitoring();
-    } else {
-        // 如果性能工具还没加载，等待一下再初始化
-        setTimeout(() => {
-            if (window.performanceUtils) {
-                initPerformanceMonitoring();
-            }
-        }, 500);
-    }
+    console.log('DOM loaded, initializing performance monitoring...');
+    
+    // 等待一段时间确保所有DOM元素都已渲染
+    setTimeout(() => {
+        // 确保性能工具已加载
+        if (window.performanceUtils) {
+            console.log('Performance utils found, initializing monitoring');
+            initPerformanceMonitoring();
+        } else {
+            console.log('Performance utils not found, retrying in 1 second...');
+            // 如果性能工具还没加载，等待一下再初始化
+            setTimeout(() => {
+                if (window.performanceUtils) {
+                    console.log('Performance utils found on retry, initializing monitoring');
+                    initPerformanceMonitoring();
+                } else {
+                    console.error('Performance utils still not available after retry');
+                }
+            }, 1000);
+        }
+        
+        // 加载增强性能监控模块
+        try {
+            loadEnhancedPerformanceMonitor();
+        } catch (error) {
+            console.warn('Enhanced performance monitor failed to load:', error);
+        }
+    }, 100);
 });
+
+// 增强性能监控变量
+let enhancedPerformanceMonitor = null;
+
+// 加载增强性能监控模块
+function loadEnhancedPerformanceMonitor() {
+    const script = document.createElement('script');
+    script.src = './enhanced-performance.js';
+    script.onload = () => {
+        console.log('✅ 增强性能监控模块已加载');
+        initEnhancedMonitoring();
+    };
+    script.onerror = (error) => {
+        console.warn('⚠️ 增强性能监控模块加载失败，使用基础监控功能', error);
+    };
+    document.head.appendChild(script);
+}
+
+// 初始化增强监控
+function initEnhancedMonitoring() {
+    if (window.EnhancedPerformanceMonitor && !enhancedPerformanceMonitor) {
+        // 查找性能监控容器
+        const container = document.getElementById('performance-monitor');
+        if (container) {
+            enhancedPerformanceMonitor = new window.EnhancedPerformanceMonitor(container);
+            enhancedPerformanceMonitor.start();
+            console.log('✅ 增强性能监控已启动');
+        } else {
+            console.warn('⚠️ 未找到性能监控容器');
+        }
+    }
+}

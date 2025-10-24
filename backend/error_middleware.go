@@ -318,7 +318,7 @@ func (v *ValidationHelper) ValidateFileSize(size, maxSize int64) *AppError {
 
 // ValidateImageFormat 验证图像格式
 func (v *ValidationHelper) ValidateImageFormat(format string) *AppError {
-	supportedFormats := []string{"JPEG", "PNG", "GIF", "BMP", "WEBP"}
+	supportedFormats := []string{"JPG", "JPEG", "PNG", "GIF", "BMP", "WEBP"}
 
 	for _, supported := range supportedFormats {
 		if format == supported {
@@ -326,7 +326,7 @@ func (v *ValidationHelper) ValidateImageFormat(format string) *AppError {
 		}
 	}
 
-	return NewInvalidFormatError(format, "JPEG, PNG, GIF, BMP, WEBP")
+	return NewInvalidFormatError(format, "JPG, JPEG, PNG, GIF, BMP, WEBP")
 }
 
 // containsUnsafePath 检查路径是否包含不安全字符

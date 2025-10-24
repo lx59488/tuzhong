@@ -603,16 +603,19 @@ body.theme-transitioning .background-animation {
     left: 50%;
     transform: translate(-50%, -50%);
     opacity: 0;
+    display: none;  /* 确保默认完全隐藏 */
     transition: opacity 0.3s ease;
+}
+
+/* 加载状态时显示 */
+.generate-btn.loading .btn-loading {
+    display: flex;
+    opacity: 1;
 }
 
 .generate-btn.loading .btn-text,
 .generate-btn.loading .btn-arrow {
     opacity: 0;
-}
-
-.generate-btn.loading .btn-loading {
-    opacity: 1;
 }
 
 .spinner {
@@ -1163,6 +1166,72 @@ body.theme-transitioning .background-animation {
     transform: translateY(-1px);
 }
 
+/* 自定义确认对话框样式 */
+.confirm-dialog {
+    max-width: 480px;
+    min-width: 360px;
+}
+
+.confirm-header {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.confirm-icon {
+    width: 48px;
+    height: 48px;
+    color: #ff6b6b;
+    stroke-width: 2;
+    margin-bottom: 10px;
+}
+
+.confirm-header h3 {
+    color: white;
+    margin: 0;
+    font-size: 20px;
+}
+
+.confirm-body {
+    text-align: center;
+    margin-bottom: 25px;
+}
+
+.confirm-body p {
+    color: rgba(255, 255, 255, 0.9);
+    margin: 0;
+    font-size: 16px;
+    line-height: 1.5;
+}
+
+.confirm-footer {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+}
+
+.danger-btn {
+    padding: 12px 24px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-size: 14px;
+    border: none;
+    background: linear-gradient(45deg, #ff6b6b, #ee5a52);
+    color: white;
+    font-weight: 600;
+}
+
+.danger-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(255, 107, 107, 0.3);
+    background: linear-gradient(45deg, #ff5252, #e53e3e);
+}
+
+.danger-btn:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 8px rgba(255, 107, 107, 0.2);
+}
+
 @keyframes spin {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
@@ -1373,6 +1442,29 @@ body.theme-light .secondary-btn {
     background: rgba(15, 23, 42, 0.08);
     color: rgba(15, 23, 42, 0.78);
     border-color: rgba(15, 23, 42, 0.15);
+}
+
+/* 确认对话框浅色主题样式 */
+body.theme-light .confirm-header h3 {
+    color: rgba(15, 23, 42, 0.85);
+}
+
+body.theme-light .confirm-body p {
+    color: rgba(15, 23, 42, 0.72);
+}
+
+body.theme-light .confirm-icon {
+    color: #dc2626;
+}
+
+body.theme-light .danger-btn {
+    background: linear-gradient(45deg, #dc2626, #b91c1c);
+    box-shadow: 0 8px 22px rgba(220, 38, 38, 0.25);
+}
+
+body.theme-light .danger-btn:hover {
+    background: linear-gradient(45deg, #b91c1c, #991b1b);
+    box-shadow: 0 6px 20px rgba(220, 38, 38, 0.3);
 }
 
 body.theme-light [data-drop-target].drag-over .file-btn,
@@ -1593,12 +1685,61 @@ input:checked + .toggle-slider:before {
     font-size: 0.8rem;
     cursor: pointer;
     transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
 }
 
 .quick-btn:hover {
     background: rgba(99, 102, 241, 0.2);
     border-color: rgba(99, 102, 241, 0.4);
     color: #a5b4fc;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.15);
+}
+
+.quick-btn:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 4px rgba(99, 102, 241, 0.1);
+}
+
+.quick-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+.quick-btn:disabled:hover {
+    background: rgba(51, 65, 85, 0.4);
+    border-color: rgba(255, 255, 255, 0.1);
+    color: #e2e8f0;
+    transform: none;
+    box-shadow: none;
+}
+
+/* 按钮加载状态动画 */
+.quick-btn.loading {
+    pointer-events: none;
+}
+
+.quick-btn.loading::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, 
+        transparent, 
+        rgba(99, 102, 241, 0.2), 
+        transparent
+    );
+    animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+    0% { left: -100%; }
+    100% { left: 100%; }
 }
 
 .quick-btn.danger {
@@ -1610,6 +1751,8 @@ input:checked + .toggle-slider:before {
     background: rgba(239, 68, 68, 0.2);
     border-color: rgba(239, 68, 68, 0.5);
     color: #f87171;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.15);
 }
 
 .quick-btn svg {
@@ -1721,6 +1864,42 @@ body.theme-light .quick-btn.danger:hover {
     margin-top: 16px;
 }
 
+.performance-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid rgba(71, 85, 105, 0.2);
+}
+
+.performance-score {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    color: #94a3b8;
+}
+
+.score-value {
+    font-size: 18px;
+    font-weight: 700;
+    padding: 4px 12px;
+    border-radius: 6px;
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: white;
+    min-width: 60px;
+    text-align: center;
+}
+
+.score-value.warning {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+}
+
+.score-value.danger {
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+}
+
 .performance-stats {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -1737,11 +1916,13 @@ body.theme-light .quick-btn.danger:hover {
     border: 1px solid rgba(71, 85, 105, 0.2);
     border-radius: 8px;
     transition: all 0.3s ease;
+    position: relative;
 }
 
 .stat-item:hover {
     background: rgba(30, 41, 59, 0.8);
     border-color: rgba(99, 102, 241, 0.3);
+    transform: translateY(-1px);
 }
 
 .stat-item label {
@@ -1755,6 +1936,116 @@ body.theme-light .quick-btn.danger:hover {
     font-weight: 700;
     color: #60a5fa;
     text-align: right;
+}
+
+.stat-value-container {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+}
+
+.mini-chart {
+    width: 80px;
+    height: 30px;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.optimization-suggestions {
+    margin-top: 20px;
+    padding: 16px;
+    background: rgba(59, 130, 246, 0.1);
+    border: 1px solid rgba(59, 130, 246, 0.2);
+    border-radius: 8px;
+}
+
+.optimization-suggestions h5 {
+    margin: 0 0 12px 0;
+    color: #60a5fa;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.suggestion-item {
+    display: flex;
+    align-items: start;
+    gap: 12px;
+    padding: 12px;
+    margin-bottom: 8px;
+    background: rgba(30, 41, 59, 0.4);
+    border-radius: 6px;
+    transition: all 0.2s ease;
+}
+
+.suggestion-item:hover {
+    background: rgba(30, 41, 59, 0.6);
+}
+
+.suggestion-icon {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: bold;
+    color: white;
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.suggestion-icon.high {
+    background: #ef4444;
+}
+
+.suggestion-icon.medium {
+    background: #f59e0b;
+}
+
+.suggestion-icon.low {
+    background: #10b981;
+}
+
+.suggestion-content {
+    flex: 1;
+}
+
+.suggestion-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #e2e8f0;
+    margin-bottom: 4px;
+}
+
+.suggestion-description {
+    font-size: 12px;
+    color: #94a3b8;
+    margin-bottom: 8px;
+    line-height: 1.4;
+}
+
+.suggestion-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.suggestion-action {
+    font-size: 11px;
+    padding: 4px 8px;
+    background: rgba(59, 130, 246, 0.2);
+    color: #93c5fd;
+    border-radius: 4px;
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.suggestion-action:hover {
+    background: rgba(59, 130, 246, 0.3);
+    color: #dbeafe;
 }
 
 .performance-actions {

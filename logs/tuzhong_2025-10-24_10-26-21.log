@@ -1,5 +1,0 @@
-[32m[INFO][0m 2025-10-24 10:26:21.081 [logger.go:376] Logging configuration applied successfully - Level: info, File: true, Console: true
-[32m[INFO][0m 2025-10-24 10:26:21.081 [logger.go:376] Configuration initialized successfully from: C:\Users\adminu\.tuzhong\config.json
-[32m[INFO][0m 2025-10-24 10:26:21.081 [logger.go:376] Application startup completed
-[32m[INFO][0m 2025-10-24 10:26:34.752 [logger.go:376] Starting tuzhong analysis: C:\Users\adminu\Desktop\test.jpg
-[32m[INFO][0m 2025-10-24 10:26:35.625 [logger.go:376] Tuzhong analysis completed - Valid: true, ImageSize: 264881, HiddenSize: 215786629

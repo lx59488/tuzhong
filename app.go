@@ -313,7 +313,81 @@ func (a *App) SetImageSizeLimit2GB() error {
 }
 
 func (a *App) SetImageSizeLimit5GB() error {
-	return a.SetMaxImageSize(5 * 1024 * 1024 * 1024) // 5GB
+	return a.generator.GetConfigManager().SetMaxImageSize(5 * 1024 * 1024 * 1024) // 5GB
+}
+
+// AnalyzeTuzhongExtended 扩展的图种分析，支持多种数据格式和加密检测
+func (a *App) AnalyzeTuzhongExtended(tuzhongPath string) (*backend.ExtendedTuzhongInfo, error) {
+	return a.generator.AnalyzeTuzhongExtended(tuzhongPath)
+}
+
+// ExtractFromTuzhongWithPassword 支持密码的图种提取
+func (a *App) ExtractFromTuzhongWithPassword(tuzhongPath, outputDir, password string) error {
+	return a.generator.ExtractFromTuzhongWithPassword(tuzhongPath, outputDir, password)
+}
+
+// DetectDataFormat 检测隐藏数据的格式类型
+func (a *App) DetectDataFormat(tuzhongPath string) (string, error) {
+	// 分析图种基本信息
+	info, err := a.generator.AnalyzeTuzhong(tuzhongPath)
+	if err != nil {
+		return "", err
+	}
+
+	if !info.IsValid {
+		return "unknown", nil
+	}
+
+	// 提取隐藏数据
+	hiddenData, err := a.generator.ExtractHiddenDataFromTuzhong(tuzhongPath, info.ImageSize)
+	if err != nil {
+		return "", err
+	}
+
+	// 创建格式检测管理器
+	manager := backend.NewFormatDetectionManager(a.generator)
+	formatInfo, _, err := manager.DetectFormat(hiddenData)
+	if err != nil {
+		return "unknown", nil
+	}
+
+	return formatInfo.Name, nil
+}
+
+// GetSupportedFormats 获取支持的数据格式列表
+func (a *App) GetSupportedFormats() []map[string]interface{} {
+	return []map[string]interface{}{
+		{
+			"name":        "ZIP",
+			"description": "标准ZIP压缩格式",
+			"encrypted":   false,
+			"extensions":  []string{".zip"},
+		},
+		{
+			"name":        "Encrypted ZIP",
+			"description": "密码保护的ZIP文件",
+			"encrypted":   true,
+			"extensions":  []string{".zip"},
+		},
+		{
+			"name":        "GZIP",
+			"description": "GZIP压缩格式",
+			"encrypted":   false,
+			"extensions":  []string{".gz"},
+		},
+		{
+			"name":        "RAW",
+			"description": "原始文件格式",
+			"encrypted":   false,
+			"extensions":  []string{".*"},
+		},
+		{
+			"name":        "Custom Encrypted",
+			"description": "自定义加密格式",
+			"encrypted":   true,
+			"extensions":  []string{".enc"},
+		},
+	}
 }
 
 func main() {

@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>自定义确认对话框测试</title>
+    <style>
+        body {
+            font-family: "Nunito", sans-serif;
+            background: #1e293b;
+            color: #e2e8f0;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+        }
+
+        .test-button {
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 14px;
+            border: none;
+            background: linear-gradient(45deg, #4ecdc4, #44a08d);
+            color: white;
+            font-weight: 600;
+            margin: 10px;
+        }
+
+        .test-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(78, 205, 196, 0.3);
+        }
+
+        /* 模态框样式 */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(5px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            transition: opacity 0.3s ease;
+        }
+
+        .modal.hidden {
+            opacity: 0;
+            pointer-events: none;
+            display: none;
+        }
+
+        .modal-content {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 20px;
+            padding: 30px;
+            max-width: 480px;
+            min-width: 360px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+            transform: scale(0.9);
+            transition: transform 0.3s ease;
+        }
+
+        .modal:not(.hidden) .modal-content {
+            transform: scale(1);
+        }
+
+        .confirm-header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .confirm-icon {
+            width: 48px;
+            height: 48px;
+            color: #ff6b6b;
+            stroke-width: 2;
+            margin-bottom: 10px;
+        }
+
+        .confirm-header h3 {
+            color: white;
+            margin: 0;
+            font-size: 20px;
+        }
+
+        .confirm-body {
+            text-align: center;
+            margin-bottom: 25px;
+        }
+
+        .confirm-body p {
+            color: rgba(255, 255, 255, 0.9);
+            margin: 0;
+            font-size: 16px;
+            line-height: 1.5;
+        }
+
+        .confirm-footer {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+        }
+
+        .secondary-btn {
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 14px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+        }
+
+        .secondary-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(-1px);
+        }
+
+        .danger-btn {
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 14px;
+            border: none;
+            background: linear-gradient(45deg, #ff6b6b, #ee5a52);
+            color: white;
+            font-weight: 600;
+        }
+
+        .danger-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(255, 107, 107, 0.3);
+            background: linear-gradient(45deg, #ff5252, #e53e3e);
+        }
+
+        .result {
+            margin-top: 20px;
+            padding: 10px 20px;
+            border-radius: 8px;
+            background: rgba(78, 205, 196, 0.1);
+            border: 1px solid rgba(78, 205, 196, 0.3);
+            color: #4ecdc4;
+        }
+    </style>
+</head>
+<body>
+    <h1>自定义确认对话框测试</h1>
+    
+    <button class="test-button" onclick="testConfirm1()">测试基本确认对话框</button>
+    <button class="test-button" onclick="testConfirm2()">测试性能数据清除对话框</button>
+    <button class="test-button" onclick="testConfirm3()">测试移除限制对话框</button>
+    
+    <div id="result"></div>
+
+    <!-- 自定义确认对话框 -->
+    <div id="confirmDialog" class="modal hidden">
+        <div class="modal-content confirm-dialog">
+            <div class="confirm-header">
+                <svg class="confirm-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <circle cx="12" cy="12" r="10"/>
+                    <line x1="9" y1="9" x2="15" y2="15"/>
+                    <line x1="15" y1="9" x2="9" y2="15"/>
+                </svg>
+                <h3 id="confirmTitle">确认操作</h3>
+            </div>
+            <div class="confirm-body">
+                <p id="confirmMessage">您确定要执行此操作吗？</p>
+            </div>
+            <div class="confirm-footer">
+                <button id="confirmCancelBtn" class="secondary-btn">取消</button>
+                <button id="confirmOkBtn" class="danger-btn">确定</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 确认对话框相关元素
+        let confirmDialog = document.getElementById("confirmDialog");
+        let confirmTitle = document.getElementById("confirmTitle");
+        let confirmMessage = document.getElementById("confirmMessage");
+        let confirmOkBtn = document.getElementById("confirmOkBtn");
+        let confirmCancelBtn = document.getElementById("confirmCancelBtn");
+
+        // 自定义确认对话框功能
+        function showConfirm(message, title = '确认操作', okText = '确定', cancelText = '取消') {
+            return new Promise((resolve) => {
+                confirmTitle.textContent = title;
+                confirmMessage.textContent = message;
+                confirmOkBtn.textContent = okText;
+                confirmCancelBtn.textContent = cancelText;
+                
+                // 清理之前的事件监听器
+                const newOkBtn = confirmOkBtn.cloneNode(true);
+                const newCancelBtn = confirmCancelBtn.cloneNode(true);
+                confirmOkBtn.parentNode.replaceChild(newOkBtn, confirmOkBtn);
+                confirmCancelBtn.parentNode.replaceChild(newCancelBtn, confirmCancelBtn);
+                confirmOkBtn = newOkBtn;
+                confirmCancelBtn = newCancelBtn;
+                
+                // 添加新的事件监听器
+                confirmOkBtn.addEventListener('click', () => {
+                    hideConfirm();
+                    resolve(true);
+                });
+                
+                confirmCancelBtn.addEventListener('click', () => {
+                    hideConfirm();
+                    resolve(false);
+                });
+                
+                // ESC键取消
+                const handleEscape = (e) => {
+                    if (e.key === 'Escape') {
+                        document.removeEventListener('keydown', handleEscape);
+                        hideConfirm();
+                        resolve(false);
+                    }
+                };
+                document.addEventListener('keydown', handleEscape);
+                
+                // 点击背景取消
+                const handleBackdropClick = (e) => {
+                    if (e.target === confirmDialog) {
+                        confirmDialog.removeEventListener('click', handleBackdropClick);
+                        hideConfirm();
+                        resolve(false);
+                    }
+                };
+                confirmDialog.addEventListener('click', handleBackdropClick);
+                
+                // 显示对话框
+                confirmDialog.classList.remove('hidden');
+                
+                // 聚焦到取消按钮（更安全的默认选择）
+                setTimeout(() => {
+                    confirmCancelBtn.focus();
+                }, 100);
+            });
+        }
+
+        function hideConfirm() {
+            confirmDialog.classList.add('hidden');
+        }
+
+        async function testConfirm1() {
+            const result = await showConfirm(
+                '这是一个基本的确认对话框测试。请选择确定或取消。',
+                '基本测试',
+                '确定',
+                '取消'
+            );
+            showResult(`基本测试结果: ${result ? '确定' : '取消'}`);
+        }
+
+        async function testConfirm2() {
+            const result = await showConfirm(
+                '确定要清除所有性能数据吗？此操作不可撤销。',
+                '清除性能数据',
+                '清除数据',
+                '取消'
+            );
+            showResult(`性能数据清除结果: ${result ? '已清除' : '已取消'}`);
+        }
+
+        async function testConfirm3() {
+            const result = await showConfirm(
+                '确定要移除所有文件大小限制吗？这将允许处理任意大小的文件，可能会影响性能。',
+                '移除文件大小限制',
+                '移除限制',
+                '取消'
+            );
+            showResult(`移除限制结果: ${result ? '已移除限制' : '保持限制'}`);
+        }
+
+        function showResult(message) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = `<div class="result">${message}</div>`;
+            setTimeout(() => {
+                resultDiv.innerHTML = '';
+            }, 3000);
+        }
+    </script>
+</body>
+</html>

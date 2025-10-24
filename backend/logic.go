@@ -73,6 +73,11 @@ func (g *Generator) SetContext(ctx context.Context) {
 	Info("Generator context set and error middleware initialized")
 }
 
+// GetConfigManager 获取配置管理器
+func (g *Generator) GetConfigManager() *ConfigManager {
+	return g.configMgr
+}
+
 // 优化的缓冲池管理
 func (g *Generator) getBuffer() []byte {
 	if buf := g.bufferPool.Get(); buf != nil {
@@ -766,22 +771,8 @@ func (g *Generator) AnalyzeTuzhong(tuzhongPath string) (*TuzhongInfo, error) {
 	fmt.Printf("[DEBUG] 隐藏数据大小: %d bytes\n", len(hiddenData))
 	info.HiddenSize = int64(len(hiddenData))
 
-	// 验证zip数据的基本结构
-	if len(hiddenData) < 4 {
-		info.IsValid = false
-		info.ErrorMessage = "隐藏数据太小，不是有效的zip文件"
-		return info, nil
-	}
-
-	// 检查zip文件头
-	if !(hiddenData[0] == 0x50 && hiddenData[1] == 0x4B) {
-		info.IsValid = false
-		info.ErrorMessage = "隐藏数据不是有效的zip文件格式"
-		return info, nil
-	}
-
-	// 尝试解析zip内容
-	files, err := g.analyzeZipData(hiddenData)
+	// 使用多格式检测器分析隐藏数据
+	files, err := g.analyzeHiddenDataWithMultiFormat(hiddenData)
 	if err != nil {
 		info.IsValid = false
 		info.ErrorMessage = fmt.Sprintf("解析隐藏数据失败: %v", err)
@@ -1183,6 +1174,11 @@ func (g *Generator) extractSingleFileOptimized(file *zip.File, outputDir string)
 	return err
 }
 
+// ExtractHiddenDataFromTuzhong 直接从图种文件中提取隐藏数据，避免读取整个文件 (公开方法)
+func (g *Generator) ExtractHiddenDataFromTuzhong(tuzhongPath string, imageSize int64) ([]byte, error) {
+	return g.extractHiddenDataFromTuzhong(tuzhongPath, imageSize)
+}
+
 // extractHiddenDataFromTuzhong 直接从图种文件中提取隐藏数据，避免读取整个文件
 func (g *Generator) extractHiddenDataFromTuzhong(tuzhongPath string, imageSize int64) ([]byte, error) {
 	fmt.Printf("[DEBUG] extractHiddenDataFromTuzhong: 打开文件 %s, imageSize: %d\n", tuzhongPath, imageSize)
@@ -1209,4 +1205,128 @@ func (g *Generator) extractHiddenDataFromTuzhong(tuzhongPath string, imageSize i
 
 	fmt.Printf("[DEBUG] 隐藏数据读取完成，大小: %d bytes\n", len(hiddenData))
 	return hiddenData, nil
+}
+
+// analyzeHiddenDataWithMultiFormat 使用多格式检测器分析隐藏数据
+func (g *Generator) analyzeHiddenDataWithMultiFormat(data []byte) ([]string, error) {
+	// 创建格式检测管理器
+	manager := NewFormatDetectionManager(g)
+
+	// 检测数据格式
+	formatInfo, detector, err := manager.DetectFormat(data)
+	if err != nil {
+		// 如果无法检测格式，回退到原始的ZIP检测
+		return g.analyzeZipData(data)
+	}
+
+	Info("Detected data format: %s (%s)", formatInfo.Name, formatInfo.Description)
+
+	// 使用对应的检测器分析数据
+	files, err := detector.Analyze(data)
+	if err != nil {
+		return nil, fmt.Errorf("分析%s格式失败: %v", formatInfo.Name, err)
+	}
+
+	return files, nil
+}
+
+// extractHiddenDataWithMultiFormat 使用多格式检测器提取隐藏数据
+func (g *Generator) extractHiddenDataWithMultiFormat(data []byte, outputDir string, password ...string) error {
+	// 创建格式检测管理器
+	manager := NewFormatDetectionManager(g)
+
+	// 检测数据格式
+	formatInfo, detector, err := manager.DetectFormat(data)
+	if err != nil {
+		// 如果无法检测格式，回退到原始的ZIP提取
+		return g.extractZipData(data, outputDir)
+	}
+
+	Info("Extracting data format: %s (%s)", formatInfo.Name, formatInfo.Description)
+
+	// 如果是加密格式且没有提供密码，返回错误
+	if formatInfo.IsEncrypted && len(password) == 0 {
+		return fmt.Errorf("检测到加密的%s格式，需要提供密码", formatInfo.Name)
+	}
+
+	// 使用对应的检测器提取数据
+	return detector.Extract(data, outputDir, password...)
+}
+
+// AnalyzeTuzhongExtended 扩展的图种分析，支持多种数据格式
+func (g *Generator) AnalyzeTuzhongExtended(tuzhongPath string) (*ExtendedTuzhongInfo, error) {
+	// 先进行基础分析
+	basicInfo, err := g.AnalyzeTuzhong(tuzhongPath)
+	if err != nil {
+		return nil, err
+	}
+
+	// 创建扩展信息
+	extendedInfo := &ExtendedTuzhongInfo{
+		TuzhongInfo:  basicInfo,
+		Capabilities: []string{"multi-format", "encryption-detection"},
+	}
+
+	// 如果基础分析失败，尝试多格式检测
+	if !basicInfo.IsValid {
+		// 重新读取隐藏数据
+		data, err := g.readTuzhongFileOptimized(tuzhongPath)
+		if err != nil {
+			return extendedInfo, nil
+		}
+
+		// 检测图片信息
+		imageSize, _, err := g.detectImageInfo(data)
+		if err != nil {
+			return extendedInfo, nil
+		}
+
+		// 提取隐藏数据
+		if int64(len(data)) <= imageSize {
+			return extendedInfo, nil // 没有隐藏数据
+		}
+
+		hiddenData := data[imageSize:]
+
+		// 使用多格式检测器
+		manager := NewFormatDetectionManager(g)
+		formatInfo, _, err := manager.DetectFormat(hiddenData)
+		if err != nil {
+			return extendedInfo, nil
+		}
+
+		// 更新信息
+		extendedInfo.DataFormat = formatInfo
+		extendedInfo.RequireAuth = formatInfo.IsEncrypted
+		if formatInfo.IsEncrypted {
+			extendedInfo.AuthHint = "此文件包含加密数据，需要密码才能提取"
+		}
+
+		// 重新标记为有效
+		extendedInfo.IsValid = true
+		extendedInfo.ErrorMessage = ""
+		extendedInfo.HiddenFiles = formatInfo.Files
+	}
+
+	return extendedInfo, nil
+}
+
+// ExtractFromTuzhongWithPassword 支持密码的图种提取
+func (g *Generator) ExtractFromTuzhongWithPassword(tuzhongPath, outputDir, password string) error {
+	Info("Starting password-protected tuzhong extraction: %s -> %s", tuzhongPath, outputDir)
+
+	// 分析图种
+	info, err := g.AnalyzeTuzhong(tuzhongPath)
+	if err != nil {
+		return err
+	}
+
+	// 读取隐藏数据
+	hiddenData, err := g.extractHiddenDataFromTuzhong(tuzhongPath, info.ImageSize)
+	if err != nil {
+		return fmt.Errorf("提取隐藏数据失败: %v", err)
+	}
+
+	// 使用多格式提取器
+	return g.extractHiddenDataWithMultiFormat(hiddenData, outputDir, password)
 }

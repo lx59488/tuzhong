@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>性能监控测试</title>
+    <style>
+        body {
+            font-family: 'Nunito', sans-serif;
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 20px;
+        }
+        
+        .test-container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: rgba(51, 65, 85, 0.3);
+            border-radius: 12px;
+            padding: 24px;
+        }
+        
+        .quick-btn {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 12px;
+            background: rgba(51, 65, 85, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            color: #e2e8f0;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin: 10px;
+        }
+        
+        .quick-btn:hover {
+            background: rgba(99, 102, 241, 0.2);
+            border-color: rgba(99, 102, 241, 0.4);
+            color: #a5b4fc;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.15);
+        }
+        
+        .quick-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            font-family: monospace;
+        }
+        
+        .success {
+            border-left: 4px solid #10b981;
+            background: rgba(16, 185, 129, 0.1);
+        }
+        
+        .error {
+            border-left: 4px solid #ef4444;
+            background: rgba(239, 68, 68, 0.1);
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h2>🔧 性能监控按钮测试</h2>
+        
+        <div>
+            <button id="refreshPerformanceBtn" class="quick-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style="width: 14px; height: 14px;">
+                    <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
+                    <path d="M21 3v5h-5"/>
+                    <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/>
+                    <path d="M3 21v-5h5"/>
+                </svg>
+                刷新数据
+            </button>
+            
+            <button id="clearPerformanceBtn" class="quick-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style="width: 14px; height: 14px;">
+                    <path d="M3 6h18"/>
+                    <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
+                    <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+                </svg>
+                清除数据
+            </button>
+            
+            <button id="exportPerformanceBtn" class="quick-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style="width: 14px; height: 14px;">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="7,10 12,15 17,10"/>
+                    <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+                导出报告
+            </button>
+        </div>
+        
+        <div id="result" class="result">
+            <div id="console"></div>
+        </div>
+        
+        <div style="margin-top: 20px;">
+            <h3>性能数据模拟</h3>
+            <div id="memoryUsage">内存使用率: --</div>
+            <div id="sessionDuration">会话时长: --</div>
+            <div id="operationCount">操作次数: --</div>
+            <div id="avgOperationTime">平均耗时: --</div>
+        </div>
+    </div>
+
+    <script>
+        // 模拟性能工具
+        window.performanceUtils = {
+            performanceMetrics: {
+                operations: [
+                    { name: 'test1', duration: 150, timestamp: Date.now() - 1000 },
+                    { name: 'test2', duration: 250, timestamp: Date.now() - 500 }
+                ],
+                memoryUsage: [
+                    { timestamp: Date.now() - 2000, usagePercentage: 45.2 },
+                    { timestamp: Date.now() - 1000, usagePercentage: 52.1 }
+                ],
+                sessionStart: Date.now() - 30000
+            },
+            
+            getPerformanceReport() {
+                const now = Date.now();
+                const sessionDuration = now - this.performanceMetrics.sessionStart;
+                const totalOperations = this.performanceMetrics.operations.length;
+                const avgTime = totalOperations > 0 ? 
+                    this.performanceMetrics.operations.reduce((sum, op) => sum + op.duration, 0) / totalOperations : 0;
+                
+                return {
+                    sessionDuration,
+                    totalOperations,
+                    averageOperationTime: avgTime,
+                    slowOperations: this.performanceMetrics.operations.filter(op => op.duration > 1000),
+                    currentMemory: this.performanceMetrics.memoryUsage.length > 0 ? 
+                        this.performanceMetrics.memoryUsage[this.performanceMetrics.memoryUsage.length - 1] : 
+                        { usagePercentage: 0 },
+                    memoryHistory: this.performanceMetrics.memoryUsage
+                };
+            }
+        };
+        
+        // 模拟消息显示函数
+        function showSuccessMessage(message) {
+            const result = document.getElementById('result');
+            result.className = 'result success';
+            result.innerHTML = `✅ ${message}`;
+            console.log('SUCCESS:', message);
+        }
+        
+        function showErrorMessage(message) {
+            const result = document.getElementById('result');
+            result.className = 'result error';
+            result.innerHTML = `❌ ${message}`;
+            console.log('ERROR:', message);
+        }
+        
+        // 更新性能显示
+        function updatePerformanceDisplay() {
+            if (!window.performanceUtils) return;
+            
+            const report = window.performanceUtils.getPerformanceReport();
+            
+            document.getElementById('memoryUsage').textContent = 
+                `内存使用率: ${report.currentMemory.usagePercentage}%`;
+            
+            const minutes = Math.floor(report.sessionDuration / 60000);
+            const seconds = Math.floor((report.sessionDuration % 60000) / 1000);
+            document.getElementById('sessionDuration').textContent = 
+                `会话时长: ${minutes}分${seconds}秒`;
+            
+            document.getElementById('operationCount').textContent = 
+                `操作次数: ${report.totalOperations}`;
+            
+            document.getElementById('avgOperationTime').textContent = 
+                `平均耗时: ${report.averageOperationTime.toFixed(1)}ms`;
+        }
+        
+        // 导出性能报告
+        function exportPerformanceReport() {
+            if (!window.performanceUtils) {
+                showErrorMessage('性能工具未初始化');
+                return;
+            }
+            
+            const report = window.performanceUtils.getPerformanceReport();
+            const reportData = {
+                timestamp: new Date().toISOString(),
+                sessionDuration: report.sessionDuration,
+                totalOperations: report.totalOperations,
+                averageOperationTime: report.averageOperationTime,
+                slowOperations: report.slowOperations,
+                currentMemory: report.currentMemory,
+                memoryHistory: report.memoryHistory
+            };
+            
+            const blob = new Blob([JSON.stringify(reportData, null, 2)], {
+                type: 'application/json'
+            });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `performance-report-${Date.now()}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+            
+            showSuccessMessage('性能报告已导出');
+        }
+        
+        // 设置按钮事件（复制自主应用的逻辑）
+        function setupPerformanceButtons() {
+            console.log('Setting up performance buttons...');
+            
+            // 刷新按钮
+            const refreshBtn = document.getElementById('refreshPerformanceBtn');
+            if (refreshBtn) {
+                console.log('Found refresh button, adding event listener');
+                refreshBtn.addEventListener('click', (e) => {
+                    console.log('Refresh button clicked');
+                    e.preventDefault();
+                    
+                    refreshBtn.disabled = true;
+                    refreshBtn.textContent = '刷新中...';
+                    
+                    try {
+                        updatePerformanceDisplay();
+                        showSuccessMessage('性能数据已刷新');
+                        console.log('Performance data refreshed successfully');
+                    } catch (error) {
+                        console.error('Error refreshing performance data:', error);
+                        showErrorMessage('刷新性能数据失败: ' + error.message);
+                    } finally {
+                        setTimeout(() => {
+                            refreshBtn.disabled = false;
+                            refreshBtn.innerHTML = `
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style="width: 14px; height: 14px;">
+                                    <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
+                                    <path d="M21 3v5h-5"/>
+                                    <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/>
+                                    <path d="M3 21v-5h5"/>
+                                </svg>
+                                刷新数据
+                            `;
+                        }, 500);
+                    }
+                });
+            }
+            
+            // 清除数据按钮
+            const clearBtn = document.getElementById('clearPerformanceBtn');
+            if (clearBtn) {
+                console.log('Found clear button, adding event listener');
+                clearBtn.addEventListener('click', (e) => {
+                    console.log('Clear button clicked');
+                    e.preventDefault();
+                    
+                    if (!confirm('确定要清除所有性能数据吗？此操作不可撤销。')) {
+                        return;
+                    }
+                    
+                    clearBtn.disabled = true;
+                    clearBtn.textContent = '清除中...';
+                    
+                    try {
+                        if (window.performanceUtils) {
+                            window.performanceUtils.performanceMetrics.operations = [];
+                            window.performanceUtils.performanceMetrics.memoryUsage = [];
+                            window.performanceUtils.performanceMetrics.sessionStart = Date.now();
+                            updatePerformanceDisplay();
+                            showSuccessMessage('性能数据已清除');
+                            console.log('Performance data cleared successfully');
+                        } else {
+                            throw new Error('性能工具未初始化');
+                        }
+                    } catch (error) {
+                        console.error('Error clearing performance data:', error);
+                        showErrorMessage('清除性能数据失败: ' + error.message);
+                    } finally {
+                        setTimeout(() => {
+                            clearBtn.disabled = false;
+                            clearBtn.innerHTML = `
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style="width: 14px; height: 14px;">
+                                    <path d="M3 6h18"/>
+                                    <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
+                                    <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+                                </svg>
+                                清除数据
+                            `;
+                        }, 500);
+                    }
+                });
+            }
+            
+            // 导出报告按钮
+            const exportBtn = document.getElementById('exportPerformanceBtn');
+            if (exportBtn) {
+                console.log('Found export button, adding event listener');
+                exportBtn.addEventListener('click', (e) => {
+                    console.log('Export button clicked');
+                    e.preventDefault();
+                    
+                    exportBtn.disabled = true;
+                    exportBtn.textContent = '导出中...';
+                    
+                    try {
+                        exportPerformanceReport();
+                        console.log('Performance report exported successfully');
+                    } catch (error) {
+                        console.error('Error exporting performance report:', error);
+                        showErrorMessage('导出性能报告失败: ' + error.message);
+                    } finally {
+                        setTimeout(() => {
+                            exportBtn.disabled = false;
+                            exportBtn.innerHTML = `
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style="width: 14px; height: 14px;">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                    <polyline points="7,10 12,15 17,10"/>
+                                    <line x1="12" y1="15" x2="12" y2="3"/>
+                                </svg>
+                                导出报告
+                            `;
+                        }, 500);
+                    }
+                });
+            }
+        }
+        
+        // 页面加载后初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('DOM loaded, setting up buttons...');
+            setupPerformanceButtons();
+            updatePerformanceDisplay();
+        });
+    </script>
+</body>
+</html>
